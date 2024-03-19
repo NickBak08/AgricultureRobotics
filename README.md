@@ -9,6 +9,11 @@ The repository for the TU/e project agriculture robotics in collaboration with V
 
 # List python packages
 List here all the python packages being used
+- numpy
+- Pillow
+- request
+- dvc
+- dvc-gdrive
 
 # Installing CVAT Information
 For installing CVAT on windows you need to follow the following steps
