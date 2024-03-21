@@ -1,6 +1,0 @@
-conda create -n yolov8 python=3.8
-conda activate yolov8
-pip install ultralytics
-pip install -r requirements.txt
-pip install scikit-image
-pip install rasterio
