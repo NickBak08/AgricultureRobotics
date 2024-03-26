@@ -1,0 +1,7 @@
+
+path: C:/Users/nickb/OneDrive/Bureaublad/TUe/Project/Code/AgricultureRobotics/ComputerVision/datasets/coco  # dataset root dir
+train: images
+val: images
+
+nc: 1
+names: ['Field']
