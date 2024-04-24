@@ -89,7 +89,7 @@ def path_tracking(refer_path,start_x,start_y,start_psi, speed):
     tracktor = KinematicModel(start_x,start_y,start_psi,speed,L,time_step)
     PID = PID_posion(kp = 2, ki = 0.01, kd = 30, target=0, upper=np.pi/6, lower=-np.pi/6)
 
-    for i in range(550):
+    for i in range(len(refer_path_np)):
         robot_state = np.zeros(2)
         robot_state[0] = tracktor.x
         robot_state[1] = tracktor.y
