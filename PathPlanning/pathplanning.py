@@ -229,10 +229,38 @@ def path_to_df(best_path):
     return df_best_path
 
 
+def interpolate_path(path,distance):
+    """
+    Function to interpolate the straight line segments of the path (otherwise they are simply a beginning and endpoint)
+    args:
+        path (list): list of geopandas Geoseries objects that describe the path
+        distance (float): distance between interpolated points
+
+    returns:
+        path (list): list of geopandas Geoseries objects that has the same length as the input, 
+                        but each straight line segment is split into more pieces
+    """
 
 
+    for i in range(len(path)): # Loop over the list of path segments
+        if i%2 == 0: # We always start the path with a straight line, and then turns and straight lines alternate, so each even entry in the list is a straight line segment
+            if i%4 ==0: # Every second straight line segment has to be reversed; each vector has the same direction, but the tractor
+                        #should drive back and forth, so each 4th element in the row (every second straight path) reversed and then interpolated
+                line = path[i][0]
+                distances = np.arange(0,line.length,distance)
+                interpolated_path = LineString([line.interpolate(distance) for distance in distances])
+                path[i] = gpd.GeoSeries(interpolated_path)
+            else:
+                line = path[i][0]
+                distances = np.arange(line.length,0,-distance)
+                interpolated_path = LineString([line.interpolate(distance) for distance in distances])
+                path[i] = gpd.GeoSeries(interpolated_path)
+        else: # Don't do anything if we have an odd index, those correspond to turns which are already interpolated. 
+            continue
+    return path
 
-def pathplanning(data_path,include_obs,turning_rad,distance,plotting,headland_size):
+
+def pathplanning(data_path,include_obs,turning_rad,distance,plotting,headland_size, interpolation_dist):
     """
     main function for the pathplanning, loads the data and generates a path (maybe its better to make this a class but idk)
     
@@ -244,46 +272,60 @@ def pathplanning(data_path,include_obs,turning_rad,distance,plotting,headland_si
         distance (float): distance between swaths in m
         plotting (bool): boolean to decide whether you want to plot the generated path or not
         headland_size (float): size of the headlands in m
+        interpolation_dist (float): the distance between points in the straight line segment
 
     returns:
         field (geopandas Geoseries): The polygon that defines the field
         best_path (pandas DataFrame): Dataframe containing the xy coordinates of each checkpoint of the path. 
 
     """
-    field = load_data(data_path,include_obs)
+    field = load_data(data_path,include_obs) 
     field_headlands = generate_headlands(field,headland_size)
     coordinates = field_headlands.get_coordinates()
     lines = edge_to_line(coordinates)
-    paths = []
+    
+    # Initialize emtpy lists to contain the generated paths and path lengths
+    paths = [] 
     path_lengths = []
-    for i in range(len(coordinates)-1):
+
+    for i in range(len(coordinates)-1): # Loop over all of the edges
         print('Finding path {}/{}'.format(i,len(coordinates)-1))
         try:
+            # Calculate the basis AB line, use that to fill the field and clip the swaths
             line,slope = basis_AB_line(lines.iloc[i],coordinates)
             swath_list = fill_field_AB(line,slope,coordinates,distance)
             swaths_clipped = clip_swaths(swath_list,field_headlands)
             
+            # If the paths have a negative slope, the heading is off by 180 degrees, this messes up the curves, so this offset is introduced
             if slope > 0:
                 offset = 0
             else:
                 offset = 180
+            
+            # Make a path with dubins curves
             path = generate_path(swaths_clipped,turning_rad,offset)
+            # Interpolate the path with some specified distance
+            path = interpolate_path(path,interpolation_dist)
             paths.append(path)
+
+            # Calculate path lenght as a measure of how good a path is, this should be replaced with a different measure
             total_len = 0
             for i in range(len(path)):
                 total_len+= path[i].length.item()
             path_lengths.append(total_len)
-        except:
+        except Exception as error: # Error handling to make sure the loop continues if an error pops up
             paths.append(None)
             path_lengths.append(0)
-            print('No swaths found for this direction, continuing')
+            print(error)
             continue
-    print(path_lengths)
+
+    # Finding the path with the best measure
     best_path_index = np.argmax(path_lengths)
     best_path = paths[best_path_index]
-    
+    # Converting path to df
     best_path = path_to_df(best_path)
 
+    # Plot the path if it is specified
     if plotting:
         fig, ax = plt.subplots()
         field.plot(ax = ax,color = 'g')
@@ -294,11 +336,14 @@ def pathplanning(data_path,include_obs,turning_rad,distance,plotting,headland_si
     return field,best_path
 
 
+
+
+
 data_path ="./data/field_geometry/test_2.json"
 include_obs = False
 turning_rad = 10
 distance = 20
-field, best_path = pathplanning(data_path,include_obs,turning_rad,distance,True,25)
+field, best_path = pathplanning(data_path,include_obs,turning_rad,distance,True,25,5)
 
 
 
