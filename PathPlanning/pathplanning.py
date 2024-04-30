@@ -225,6 +225,17 @@ def path_to_df(best_path):
     """
     coords = [x.get_coordinates() for x in best_path]
     df = pd.concat(coords)
+    # Few lines of code to implement dummy planting commands
+    sequence_len = 10
+    zeros = [0]*sequence_len
+    ones = [1]*sequence_len
+
+    command = []
+    while len(command)<= len(df):
+        command+=zeros
+        command+=ones
+    command = command[:len(df)]
+    df['command'] = command
     df_best_path = df.set_index((np.arange(len(df))))
     return df_best_path
 
@@ -340,6 +351,7 @@ def pathplanning(data_path,include_obs,turning_rad,distance,plotting,headland_si
 
 
 data_path ="./data/field_geometry/test_2.json"
+
 include_obs = False
 turning_rad = 10
 distance = 20
