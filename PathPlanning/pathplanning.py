@@ -7,7 +7,7 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 import math
-from dubins_curves import *
+from .dubins_curves import *
 
 
 def load_data(filepath,include_obstacles = False):
@@ -170,7 +170,7 @@ def clip_swaths(swath_list,field):
 
 
 def generate_path(swaths_clipped_nonempty,turning_rad,offset):
-    turning_rad = 10
+    # turning_rad = 10
     line = []
 
     for i in range(len(swaths_clipped_nonempty)-1):
@@ -280,6 +280,9 @@ def pathplanning(data_path,include_obs,turning_rad,distance,plotting,headland_si
 
     """
     field = load_data(data_path,include_obs) 
+    fig, ax = plt.subplots()
+    field.plot(ax=ax, color='lightblue', edgecolor='black')
+    plt.savefig("filter/path_plot.png")
     field_headlands = generate_headlands(field,headland_size)
     coordinates = field_headlands.get_coordinates()
     lines = edge_to_line(coordinates)
@@ -320,6 +323,7 @@ def pathplanning(data_path,include_obs,turning_rad,distance,plotting,headland_si
             continue
 
     # Finding the path with the best measure
+    print(path_lengths)
     best_path_index = np.argmax(path_lengths)
     best_path = paths[best_path_index]
     # Converting path to df
@@ -331,7 +335,7 @@ def pathplanning(data_path,include_obs,turning_rad,distance,plotting,headland_si
         field.plot(ax = ax,color = 'g')
         field_headlands.boundary.plot(ax = ax,color = 'r')
         best_path.plot(x = 'x', y = 'y',ax = ax,color = 'magenta')
-        plt.show()
+        plt.savefig("filter/path_field.png")
     
     return field,best_path
 
@@ -339,11 +343,11 @@ def pathplanning(data_path,include_obs,turning_rad,distance,plotting,headland_si
 
 
 
-data_path ="./data/field_geometry/test_2.json"
-include_obs = False
-turning_rad = 10
-distance = 20
-field, best_path = pathplanning(data_path,include_obs,turning_rad,distance,True,25,5)
+# data_path ="./data/field_geometry/test_2.json"
+# include_obs = False
+# turning_rad = 10
+# distance = 20
+# field, best_path = pathplanning(data_path,include_obs,turning_rad,distance,True,25,5)
 
 
 
