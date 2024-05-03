@@ -170,3 +170,5 @@ cython_debug/
 
 # Ignore image data
 ComputerVision/images/*
+filter
+test
