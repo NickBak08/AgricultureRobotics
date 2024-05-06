@@ -7,23 +7,16 @@ The repository for the TU/e project agriculture robotics in collaboration with V
 - Commit often not only when you want to push your code
 - When merging asks others to review the code
 
-# List python packages
-List here all the python packages being used
-- numpy
-- Pillow
-- request
-- dvc
-- dvc-gdrive
-
 # Installing CVAT Information
 For installing CVAT on windows you need to follow the following steps
 [Link to installing instructions](https://opencv.github.io/cvat/docs/administration/basics/installation/)
 
-# Using DVC for data sharing
-Github is not made to share data it is made for text files. To fix this DVC is used. With DVC you can push images to a cloud provider and pull them. This is especially handy when multiple users need to use the same data.
-
-The first step is to install dvc and dvc-gdrive (For now make sure you pulled the computer vision branch and you work in it)!
-``` pip install dvc ```
-``` pip install dvc-gdrive ```
-
-After that you can use dvc pull to download the data and you can use push when you want to upload new data. 
+# Using docker to run the program:
+1) Install docker: https://docs.docker.com/desktop/install/windows-install/
+2) Make sure you have installed the most updated version of google chrome
+3) Add personal access token to GitHub account (Settings -> developer settings -> personal access tokens).
+4) Make sure repo and write:packages boxes are checked when creating personal access token
+5) Clone repository onto your system
+6) In powershell go to the folder you just cloned and type: ``` docker build -t streamlit . ``` (Can take a couple of minutes)
+7) When it is build run: ``` docker run -it -p 8501:8501 -e GITHUB_TOKEN="YOUR_TOKEN" streamlit ```
+8) In google chrome type localhost:8501
