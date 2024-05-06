@@ -1,0 +1,6 @@
+
+train: E:/硕士文件/TUE/tue-5ARIP10-Q3 Team project/YOLO/ultralytics-main-sataliite/ultralytics-main/datasets/images/train
+val: E:/硕士文件/TUE/tue-5ARIP10-Q3 Team project/YOLO/ultralytics-main-sataliite/ultralytics-main/datasets/images/val
+
+nc: 1
+names: ['Field']
