@@ -33,7 +33,7 @@ if st.session_state.clicked_predict:
     if uploaded_file.getvalue() is not None:
         st.image(uploaded_file)
         image_predict = Image.open(uploaded_file)
-        st.image("C:/Users/nickb/OneDrive/Bureaublad/TUe/Project/FinalCode/AgricultureRobotics/test/test1.png")
+        st.image("./test/test1.png")
 
 
 # Button for detecting fields
@@ -49,7 +49,7 @@ st.title("Select Field")
 def value_change():
     predict_json(st.session_state['scale'],st.session_state['approx'])
     filter_json(st.session_state['fieldnr'])
-    data_path ="C:/Users/nickb/OneDrive/Bureaublad/TUe/Project/FinalCode/AgricultureRobotics/filter/filtered_geojson.json"
+    data_path ="./filter/filtered_geojson.json"
     field = load_data(data_path)
     fig, ax = plt.subplots()
     field.plot(ax=ax, color='lightblue', edgecolor='black')
@@ -62,7 +62,7 @@ approximate_poly = st.number_input("Fine tune edges",value=0.001,on_change=value
 field_number = st.number_input("Field_number",value=1,on_change=value_change,key="fieldnr")
 
 if st.session_state.show_field:
-    st.image("C:/Users/nickb/OneDrive/Bureaublad/TUe/Project/FinalCode/AgricultureRobotics/filter/check_field.png")
+    st.image("./filter/check_field.png")
 # For inputing the parameters of the dynamics of the tractor
 st.title("Parameters path planning")
 turning_radius = st.number_input("Turning radius", value=1)
@@ -71,7 +71,7 @@ headland_size = st.number_input("Headland size",value=1)
 
 # Button for detecting fields
 def plan_path():
-    data_path ="C:/Users/nickb/OneDrive/Bureaublad/TUe/Project/FinalCode/AgricultureRobotics/filter/filtered_geojson.json"
+    data_path ="./filter/filtered_geojson.json"
     include_obs = False
     turning_rad = turning_radius
     distance = distance_AB
@@ -83,7 +83,7 @@ st.button("Plan path",on_click=plan_path)
 
 if st.session_state.clicked_path:
     st.title("Path planning result")
-    st.image("C:/Users/nickb/OneDrive/Bureaublad/TUe/Project/FinalCode/AgricultureRobotics/filter/path_field.png")
+    st.image("./filter/path_field.png")
 
 st.title("Simulation_result")
 velocity_model = st.number_input("Velocity seeder",value=1.0)
@@ -96,5 +96,5 @@ def simulate_path():
 
 st.button("Simulate path test",on_click=simulate_path)
 if st.session_state.clicked_simulation:
-    st.image("C:/Users/nickb/OneDrive/Bureaublad/TUe/Project/FinalCode/AgricultureRobotics/filter/simulation_field.png")
-    st.image("C:/Users/nickb/OneDrive/Bureaublad/TUe/Project/FinalCode/AgricultureRobotics/filter/simulation_field_mpc.png")
+    st.image("./filter/simulation_field.png")
+    st.image("./filter/simulation_field_mpc.png")

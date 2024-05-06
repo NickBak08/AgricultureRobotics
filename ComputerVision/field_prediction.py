@@ -73,12 +73,12 @@ def predict_json(scale,approx):
         f.write('  "type": "FeatureCollection",\n')
         f.write('  "features": [\n')
 
-        for index, j in enumerate(cnt):
+        for index, field in enumerate(cnt):
             # Choose epsilon (approximation accuracy). You can adjust this value.
-            epsilon = approx * cv2.arcLength(j, True)  # 2% of the arc length
+            epsilon = approx * cv2.arcLength(field, True)  # 2% of the arc length
 
             # Approximate the contour to create a smoother polygon
-            approx_polygon = cv2.approxPolyDP(j, epsilon, True)
+            approx_polygon = cv2.approxPolyDP(field, epsilon, True)
             result = []
             for i in approx_polygon:
                 temp = list(i[0])
@@ -103,8 +103,8 @@ def predict_json(scale,approx):
 
                 for idx, line in enumerate(result):
                     f.write("            [\n")
-                    f.write("              {},\n".format(line[0] * scale))
-                    f.write("              {}\n".format(line[1] * scale))
+                    f.write("              {},\n".format(line[0]*scale))
+                    f.write("              {}\n".format(line[1]*scale))
                     f.write(
                         "            ]{}\n".format("," if idx < len(result) - 1 else "")
                     )
