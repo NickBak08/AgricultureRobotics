@@ -88,13 +88,21 @@ if st.session_state.clicked_path:
 st.title("Simulation_result")
 velocity_model = st.number_input("Velocity seeder",value=1.0)
 iteration_number = st.number_input("Iteration limit",value=500)
+option = st.selectbox("Which controller to use for simulation?",("PID","MPC"))
 
 def simulate_path():
-    path_tracking(st.session_state['simulate_path'],velocity_model)
-    track_path(st.session_state['simulate_path'],velocity_model,iteration_number)
+    if option == "PID":
+        path_tracking(st.session_state['simulate_path'],velocity_model)
+    elif option == "MPC":
+        track_path(st.session_state['simulate_path'],velocity_model,iteration_number)
     st.session_state.clicked_simulation = True
 
 st.button("Simulate path test",on_click=simulate_path)
+
 if st.session_state.clicked_simulation:
-    st.image("./filter/simulation_field.png")
-    st.image("./filter/simulation_field_mpc.png")
+    if option == "PID":
+        st.image("./filter/simulation_field.png")
+    elif option == "MPC":
+        st.image("./filter/simulation_field_mpc.png")
+    else:
+        st.write("Wrong simulation chosen or error")
