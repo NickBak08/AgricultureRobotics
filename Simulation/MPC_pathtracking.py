@@ -9,7 +9,7 @@ import pandas as pd
 # mpc parameters
 NX = 3  
 NU = 2  
-T = 8  
+T = 5  
 R = np.diag([0.1, 0.1])  
 Q = np.diag([1, 1, 1])  
 Qf = Q  
@@ -193,7 +193,7 @@ def linear_mpc_control(xref, x0, delta_ref, ugv):
     constraints += [cvxpy.abs(u[1, :]) <= MAX_STEER]
 
     prob = cvxpy.Problem(cvxpy.Minimize(cost), constraints)
-    prob.solve(solver=cvxpy.ECOS, verbose=False)
+    prob.solve(solver=cvxpy.SCS, verbose=False)
 
     if prob.status == cvxpy.OPTIMAL or prob.status == cvxpy.OPTIMAL_INACCURATE:
         opt_x = get_nparray_from_matrix(x.value[0, :])
@@ -212,9 +212,8 @@ def linear_mpc_control(xref, x0, delta_ref, ugv):
 
 def track_path(refer_df, speed, iteration_limit):
 
-    refer_path_np = refer_df.to_numpy()
-    x_points = refer_path_np[:, 0]
-    y_points = refer_path_np[:, 1]
+    x_points = np.array(refer_df['x'])
+    y_points = np.array(refer_df['y'])
     reference_path = MyReferencePath(x_points, y_points)
     goal = reference_path.target_point
 
@@ -228,9 +227,9 @@ def track_path(refer_df, speed, iteration_limit):
 
     x_ = []
     y_ = []
-    fig = plt.figure(1)
+    #fig = plt.figure(1)
 
-    camera = Camera(fig)
+    #camera = Camera(fig)
 
     for i in range(iteration_limit):
         robot_state = np.zeros(4)
@@ -248,15 +247,15 @@ def track_path(refer_df, speed, iteration_limit):
         x_.append(ugv.x)
         y_.append(ugv.y)
 
-        plt.cla()
-        plt.plot(reference_path.refer_path[:, 0], reference_path.refer_path[:,
-                 1], "-.b",  linewidth=1.0, label="course")
-        plt.plot(x_, y_, "-r", label="trajectory")
-        plt.plot(reference_path.refer_path[target_ind, 0],
-                 reference_path.refer_path[target_ind, 1], "go", label="target")
+        # plt.cla()
+        # plt.plot(reference_path.refer_path[:, 0], reference_path.refer_path[:,
+        #          1], "-.b",  linewidth=1.0, label="course")
+        # plt.plot(x_, y_, "-r", label="trajectory")
+        # plt.plot(reference_path.refer_path[target_ind, 0],
+        #          reference_path.refer_path[target_ind, 1], "go", label="target")
         # plt.axis("equal")
-        # plt.grid(True)
-        plt.pause(0.001)
+        # # plt.grid(True)
+        # plt.pause(0.001)
 
         if np.linalg.norm(robot_state[0:2]-goal) <= 0.1:
             print("reach goal")
@@ -271,10 +270,34 @@ def track_path(refer_df, speed, iteration_limit):
     plt.title('Path Tracking Result')
     plt.legend()
     plt.axis("equal")
-    # plt.grid(True)
+    plt.grid(True)
     plt.show()
 
+    return x_, y_
 
+def store_path_data(x_, y_):
+    path_df = pd.DataFrame({
+        'x': x_,
+        'y': y_
+    })
+    return path_df
+
+
+def path_tracking_result(data_path,speed,iteration_limit):
+
+    refer_path = pd.read_csv(data_path)
+    x_,y_ = track_path(refer_path,speed,iteration_limit)
+    path_df = store_path_data(x_, y_)
+    return path_df
+
+
+data_path ='D:/5ARIP10 Team Project/working space/AgricultureRobotics/Simulation/bestpath.csv'
+speed = 15
+iteration_limit = 5000
+
+actual_path = path_tracking_result(data_path,speed,iteration_limit)
+pathresult = actual_path.to_csv('actualpath.csv', index=True)
+'''
 center_x = 10  
 center_y = 0   
 radius = 10    
@@ -297,10 +320,5 @@ data = pd.DataFrame({
     'y': y
 })
 refer_df = pd.DataFrame(data)
-speed = 1.5
-iteration_limit = 500
+'''
 
-
-
-
-track_path(refer_df,speed,iteration_limit)
