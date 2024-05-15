@@ -1,0 +1,72 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "Name": "field"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              100
+            ],
+            [
+              100,
+              50
+            ],
+            [
+              50,
+              0
+            ],
+            [
+              1,
+              1
+            ]
+          ]
+        ]
+      }
+    },
+    {
+        "type": "Feature",
+        "properties": {
+          "Name": "obstacle"
+        },
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                30,
+                30
+              ],
+              [
+                31,
+                70
+              ],
+              [
+                70,
+                69
+              ],
+              [
+                69,
+                30
+              ],
+              [
+                30,
+                33
+              ]
+             
+            ]
+          ]
+        }
+      }
+  ]
+}
