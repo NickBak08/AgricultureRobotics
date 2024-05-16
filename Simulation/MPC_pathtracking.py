@@ -18,7 +18,7 @@ L = 2
  
 MAX_STEER = np.deg2rad(70.0)  # maximum steering angle [rad]
 MAX_DSTEER = np.deg2rad(70.0)  # maximum steering speed [rad/s]
-
+MAX_ACC = 0.5
 
 def get_nparray_from_matrix(x):
     """Convert a matrix to a flattened numpy array."""
@@ -225,6 +225,54 @@ class MyReferencePath:
                 xref[2, i] = self.refer_path[ncourse - 1, 2]
         return xref, ind, uref, curv
 
+class PIDController:
+    def __init__(self, kp, ki, kd, target_speed):
+        """
+        Initialize the PID Controller.
+
+        Args:
+            kp (float): Proportional gain.
+            ki (float): Integral gain.
+            kd (float): Derivative gain.
+            target_speed (float): The target speed for the PID controller.
+        """
+        self.kp = kp
+        self.ki = ki
+        self.kd = kd
+        self.target_speed = target_speed
+        self.integral = 0
+        self.previous_error = 0
+        self.last_time = None
+
+    def compute(self, current_speed):
+        """
+        Compute the control signal based on the current speed.
+
+        Args:
+            current_speed (float): The current speed of the vehicle.
+            current_time (float): The current time in seconds.
+
+        Returns:
+            float: The control output which is the acceleration/deceleration command.
+        """
+        # Calculate PID errors
+        error = self.target_speed - current_speed
+        self.integral += error * dt
+        derivative = (error - self.previous_error) / dt if dt > 0 else 0
+        self.previous_error = error
+
+        # Compute PID output
+        output = (self.kp * error) + (self.ki * self.integral) + (self.kd * derivative)
+        return output
+
+    def reset(self):
+        """
+        Reset the integral and previous error of the PID controller.
+        """
+        self.integral = 0
+        self.previous_error = 0
+        self.last_time = None
+
 def adjust_num_steps(curvature):
     """
     Adjust the number of steps based on the curvature of the path.
@@ -333,21 +381,30 @@ def track_path(refer_df, speed, iteration_limit):
     L = 2.0  
     dt = 0.1  
     tractor = KinematicModel(start_x, start_y, start_yaw, speed, L, dt)   
-
+    pid = PIDController(kp=0.1, ki=0.01, kd=0.05, target_speed=10.0)
     x_ = []
     y_ = []
     passed_measurements = 0
     total_measurements = np.sum(commands)
-
+    state_x = []
+    state_y = []
+    state_yaw = []
+    output_delta = []
+    target_indices = []
+    output_velocity = []
     # Create a function to update the plot at each frame
     def update_plot(frame):
         plt.cla()
-        plt.plot(reference_path.refer_path[:, 0], reference_path.refer_path[:, 1], "-.b", linewidth=1.0, label="course")
-        plt.plot(x_[:frame], y_[:frame], "-r", label="trajectory")
-        plt.plot(reference_path.refer_path[target_ind, 0], reference_path.refer_path[target_ind, 1], "go", label="target")
+        plt.plot(reference_path.refer_path[:, 0], reference_path.refer_path[:, 1], "-.b", linewidth=1.0, label="Reference Path")
+        plt.plot(x_[:frame], y_[:frame], "-r", label="Tracked path")
+        # if frame < len(target_indices):
+        #     current_target = target_indices[frame]
+        #     plt.plot(reference_path.refer_path[current_target, 0], reference_path.refer_path[current_target, 1], "go", label="target")
+        # plt.plot(reference_path.refer_path[target_ind, 0], reference_path.refer_path[target_ind, 1], "go", label="target")
         plt.xlabel("X")
         plt.ylabel("Y")
         plt.axis("equal")
+        plt.title('MPC Path Tracking')
         plt.legend()
         plt.grid(True)
 
@@ -361,40 +418,56 @@ def track_path(refer_df, speed, iteration_limit):
         robot_state[3] = tractor.v
         x0 = robot_state[0:3]
 
+
         # Calculate reference trajectory
         xref, target_ind, uref, curvature = reference_path.calc_ref_trajectory(
             robot_state)
-        
+        target_indices.append(target_ind)
         # Moving block
         num_steps = adjust_num_steps(curvature)
         # Perform MPC control
         opt_v, opt_delta, opt_x, opt_y, opt_yaw = linear_mpc_control(
             xref, x0, uref, tractor,num_steps)
-        
+        state_x.append(tractor.x)
+        state_y.append(tractor.y)
+        state_yaw.append(tractor.yaw)
+        output_delta.append(opt_delta[0])
+        # output_velocity.append(opt_v)
         # Update vehicle state (assume the acceleration is zero)
-        tractor.update_state(0, opt_delta[0])  
+        pid_speed_adjustment = pid.compute(tractor.v)
+        acceleration = max(-MAX_ACC, min(pid_speed_adjustment, MAX_ACC))
+        tractor.update_state(acceleration, opt_delta[0])  
 
         x_.append(tractor.x)
         y_.append(tractor.y)
 
         # Check if tracktor passed the planting point (distance <= 0.5)
-        if commands[target_ind] == 1 and np.linalg.norm(robot_state[0:2] - reference_path.refer_path[target_ind, :2]) <= 0.8:
+        if commands[target_ind] == 1 and np.linalg.norm(robot_state[0:2] - reference_path.refer_path[target_ind, :2]) <= 0.5:
             passed_measurements += 1
             commands[target_ind] = 0
 
          # Check if the goal is reached
-        if np.linalg.norm(robot_state[0:2]-goal) <= 0.1:
+        if np.linalg.norm(robot_state[0:2]-goal) <= 1:
             print("reach goal")
             break
-    # fig = plt.figure(figsize=(8, 8))
+    #fig = plt.figure(figsize=(8, 8))
     #animation = FuncAnimation(fig, update_plot, frames=len(x_), interval=100)
 
     # Save the animation as a GIF
-    #animation.save('D:/5ARIP10 Team Project/working space/AgricultureRobotics/Simulation/path_tracking_animation.gif', writer='pillow')   
+    #animation.save('D:/5ARIP10 Team Project/working space/AgricultureRobotics/Simulation/MPC_path_tracking_animation.gif', writer='pillow')   
         
     measurement_accuracy = passed_measurements / total_measurements * 100
     print(f"Measurement accuracy: {measurement_accuracy:.2f}%")
-
+    input_df = pd.DataFrame({
+        'robot_x':state_x,
+        'robot_y':state_y,
+        'robot_yaw':state_yaw
+    })
+    output_df = pd.DataFrame({
+        'steering angle':output_delta
+    })
+    input_df.to_csv('D:/5ARIP10 Team Project/working space/AgricultureRobotics/Simulation/input.csv',index=True)
+    output_df.to_csv('D:/5ARIP10 Team Project/working space/AgricultureRobotics/Simulation/output.csv',index=True)
     # Visualize the final result
     plt.figure(figsize=(8, 8))
     plt.plot(refer_df['x'], refer_df['y'], '-.b', linewidth=1.0, label='Reference Path')
@@ -406,7 +479,7 @@ def track_path(refer_df, speed, iteration_limit):
     plt.axis("equal")
     plt.grid(True)
     plt.show()
-    #plt.savefig('D:/5ARIP10 Team Project/working space/AgricultureRobotics/Simulation/path_tracking_result.png')
+    plt.savefig('D:/5ARIP10 Team Project/working space/AgricultureRobotics/Simulation/path_tracking_result.png')
 
     return x_, y_ , measurement_accuracy
 
@@ -426,8 +499,8 @@ def path_tracking_result(data_path,speed,iteration_limit):
     return path_df
 
 data_path ='D:/5ARIP10 Team Project/working space/AgricultureRobotics/Simulation/bestpath.csv'
-speed = 15
-iteration_limit = 5000
+speed = 5
+iteration_limit = 7000
 
 actual_path = path_tracking_result(data_path,speed,iteration_limit)
 
