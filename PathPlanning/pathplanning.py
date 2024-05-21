@@ -10,7 +10,7 @@ import math
 from .dubins_curves import *
 
 
-def load_data(filepath,include_obstacles = False):
+def load_data(filepath,include_obstacles = False,scale_pixels:int=1):
     """
     function to load json file and create polygon object
 
@@ -33,7 +33,7 @@ def load_data(filepath,include_obstacles = False):
     polygons = []
     for i in range(len(json_data['features'])):
         coordinates.append(json_data['features'][i]['geometry']['coordinates'])
-        polygons.append(gpd.GeoSeries(Polygon(coordinates[i][0])))
+        polygons.append(gpd.GeoSeries(Polygon(coordinates[i][0])).scale(scale_pixels,scale_pixels))
     
     field = polygons[0]
     if include_obstacles:
