@@ -8,58 +8,9 @@ import numpy as np
 import pandas as pd
 import math
 from dubins_curves import *
-
-
-
 import shapely.affinity
-
-
-def generate_headlands(field,size):
-    field_with_headlands = field.buffer(-size)#, cap_style = 'square', join_style = 'mitre'
-    return field_with_headlands
-        
-
-def linefromvec(vec):
-    """
-    turn a vector in to a line in 2d with a slope and intercept
-
-    attrs:
-        vec (array): 2x2 array with x,y coords of begin point in first row, xy coords of end point in second row
-
-    returns:
-        slope (float): slope of the resulting line
-        intercept (float): intercept of the resulting line
-
-    """
-    slope = (vec[1][1]-vec[0][1])/(vec[1][0]-vec[0][0])
-    intercept = vec[1][1]-vec[1][0]*slope
-    return slope,intercept
-
-def edge_to_line(coordinates):
-    """
-    turns a df of field coordinates into a df with the slopes and intercepts of all edges of the field
-    
-    attrs:
-        coordinates (geopandas DataFrame): a GeoPandas Dataframe containing the xy coordinates of all points that describe a polygon. Can be obtained using the get_coordinates() method
-    returns:
-        edge_lines (pandas DataFrame): a Pandas DF that contains slopes and intercepts of all lines describing the outline of a polygon
-    
-    """
-    edge_points = len(coordinates)
-    slopes = []
-    intercepts = []
-    for edge in range(edge_points-1):
-        x_begin = coordinates.iloc[edge]['x']
-        x_end = coordinates.iloc[edge+1]['x']
-        y_begin = coordinates.iloc[edge]['y']
-        y_end = coordinates.iloc[edge+1]['y']
-        vector = np.array([[x_begin,y_begin],[x_end,y_end]])
-        slope,intercept = linefromvec(vector)
-        slopes.append(slope)
-        intercepts.append(intercept)
-    d = {'slope': slopes, 'intercept': intercepts}
-    edge_lines = pd.DataFrame(data = d)
-    return edge_lines
+from shapely import Point
+from shapely.ops import split, nearest_points
 
 
 def load_data(filepath,include_obstacles = False):
@@ -74,13 +25,10 @@ def load_data(filepath,include_obstacles = False):
         field (geopandas Geoseries)
 
     """
-    # This cell opens the json file that contains field geometry
+
     with open(filepath) as json_file:
         json_data = json.load(json_file) # or geojson.load(json_file)
 
-    # This cell parses the json data and obtains a list with the coordinates for each polygon like
-    # [[polygon1_coords],[polygon2_coords],....]
-    # where polygon1_coords looks something like this: [[x1,y1],[x2,y2],......]
     coordinates = []
     polygons = []
     for i in range(len(json_data['features'])):
@@ -93,6 +41,59 @@ def load_data(filepath,include_obstacles = False):
             field = field.symmetric_difference(polygons[i])
 
     return field
+
+
+def generate_headlands(field,turning_rad,tractor_width):
+    headland_size = 3*turning_rad # minimum width of the headlands for the tractor to turn
+    headland_size = math.ceil(headland_size / tractor_width) * tractor_width # make sure the headlands are a multiple of the tractor width to not waste space or drive over seeds
+    field_with_headlands = field.buffer(-headland_size, cap_style = 'square', join_style = 'mitre')
+    
+    return field_with_headlands, headland_size
+        
+
+def linefromvec(vec):
+    """
+    turn a vector in to a line in 2d with a slope and intercept
+
+    attrs:
+        vec (array): 2x2 array with x,y coords of begin point in first row, xy coords of end point in second row
+
+    returns:
+        slope (float): slope of the resulting line
+        intercept (float): intercept of the resulting line
+
+    """
+    if vec[1][0]-vec[0][0] == 0: # if the line is vertical, the y-intercept and slope don't exist
+        slope = None
+        intercept = vec[0][0] # store the x-intercept instead of the y-intercpet
+    else:
+        slope = (vec[1][1]-vec[0][1])/(vec[1][0]-vec[0][0]) # if the line is horizontal, the slope is 0
+        intercept = vec[1][1]-vec[1][0]*slope 
+
+    return slope,intercept
+
+def edge_to_line(coordinates):
+    """
+    turns a df of field coordinates into a df with the slopes and intercepts of all edges of the field
+    
+    attrs:
+        coordinates (geopandas DataFrame): a GeoPandas Dataframe containing the xy coordinates of all points that describe a polygon. Can be obtained using the get_coordinates() method
+    returns:
+        edge_lines (pandas DataFrame): a Pandas DF that contains slopes and intercepts of all lines describing the outline of a polygon
+    
+    """
+    edge_lines = pd.DataFrame(columns=['slope', 'intercept'])
+
+    for edge in range(len(coordinates)-1):
+        x_begin = coordinates.iloc[edge]['x']
+        x_end = coordinates.iloc[edge+1]['x']
+        y_begin = coordinates.iloc[edge]['y']
+        y_end = coordinates.iloc[edge+1]['y']
+        vector = np.array([[x_begin,y_begin],[x_end,y_end]])
+        slope,intercept = linefromvec(vector)
+        edge_lines = pd.concat([edge_lines, pd.DataFrame([[slope, intercept]], columns=['slope', 'intercept'])], ignore_index=True)
+
+    return edge_lines
 
 def basis_AB_line(edge,coordinates):  
     """
@@ -133,14 +134,14 @@ def basis_AB_line(edge,coordinates):
 
     return base_AB, slope
 
-def fill_field_AB(base_AB,slope,coordinates,distance):
+def fill_field_AB(base_AB,slope,coordinates,tractor_width):
     """
-    takes the base AB line, its slope and a distance between lines and fills the field with AB lines of a given angle
+    takes the base AB line, its slope and a distance between lines (equal to tractor width) and fills the field with AB lines of a given angle
     attrs:
         base_AB (array): array with xy coordinates of beginning and end points of the base vector
         slope (float): the slope of the basis AB line
         coordinates (pandas DataFrame): a pandas DF containing all the coordinates that describe the polygon
-        d (float): distance between two AB lines
+        tractor_width (float): tractor width (distance between two AB lines) in m
 
     returns:
         swath_list (list): a list containing Geoseries objects of different AB-lines
@@ -152,28 +153,36 @@ def fill_field_AB(base_AB,slope,coordinates,distance):
     # Determine amount of AB-lines that are needed if they are not horizontal
     xmax = max(coordinates['x'])
     xmin = min(coordinates['x'])
-    nr_passes = int((xmax-xmin)//distance + 2)
+    nr_passes = int((xmax-xmin)//tractor_width + 2)
 
     if pd.isna(slope): # vertical AB-lines
-        dx = distance
+        dx = tractor_width
+        base_AB[0][0]+= dx/2 # update the base AB line to be inside of the mainland and the planter can plant exactly on the headland line
+        base_AB[1][0]+= dx/2
         for i in range(-nr_passes,nr_passes):
             swath_list.append(gpd.GeoSeries(LineString([[base_AB[0][0]+dx*i,base_AB[0][1]],[base_AB[1][0]+dx*i,base_AB[1][1]]])))
     else:
         theta = np.arctan(slope) # angle of AB line wrt x-axis
         if theta == 0 : # horizontal AB line
-            dy = distance # use y-offset for horizontal lines
+            dy = tractor_width # use y-offset for horizontal lines
+            base_AB[0][1]+= dy/2 # update the base AB line to be inside of the mainland and the planter can plant exactly on the headland line
+            base_AB[1][1]+= dy/2
             # Determine amount of AB-lines that are needed for horizontal lines
             ymax = max(coordinates['y'])
             ymin = min(coordinates['y'])
-            nr_passes = int((ymax-ymin)//distance + 2)
+            nr_passes = int((ymax-ymin)//tractor_width + 2)
             # update the list of AB-lines 
             for i in range(-nr_passes,nr_passes):
                 swath_list.append(gpd.GeoSeries(LineString([[base_AB[0][0],base_AB[0][1]+dy*i],[base_AB[1][0],base_AB[1][1]+dy*i]])))
         else:
-            dx = distance/np.sin(theta) # use the angle and parameter d to calculate x-offset between swaths
+            dx = tractor_width/np.sin(theta) # use the angle and parameter d to calculate x-offset between swaths
+            base_AB[0][0]+= dx/2 # update the base AB line to be inside of the mainland and the planter can plant exactly on the headland line
+            base_AB[1][0]+= dx/2
             for i in range(-nr_passes,nr_passes):
-                swath_list.append(gpd.GeoSeries(LineString([[base_AB[0][0]+dx*i,base_AB[0][1]],[base_AB[1][0]+dx*i,base_AB[1][1]]])))                
+                swath_list.append(gpd.GeoSeries(LineString([[base_AB[0][0]+dx*i,base_AB[0][1]],[base_AB[1][0]+dx*i,base_AB[1][1]]])))    
+
     return swath_list
+
 def clip_swaths(swath_list,field):
     """
     function to clip swaths to the headlands
@@ -185,18 +194,22 @@ def clip_swaths(swath_list,field):
         swaths_clipped_nonempty (list): a list of geoseries objects that contains the clipped swaths that are not empty
     """
     swaths_clipped = []
+
     for swath in range(len(swath_list)):
         swaths_clipped.append(gpd.clip(swath_list[swath],field))
         swaths_clipped_nonempty = [swath for swath in swaths_clipped if not swath.get_coordinates().empty]
+        swaths_type = [type(swath[0]) for swath in swaths_clipped_nonempty]
     if len(swaths_clipped_nonempty) == 0:
         raise Exception('No swaths were generated, something went wrong with clipping')
+    if MultiLineString in swaths_type:
+        raise Exception('No swaths were generated, need to decompose the field.')
+    
     return swaths_clipped_nonempty
-
 
 
 def generate_path(swaths_clipped_nonempty, turning_rad):
 
-    line = []
+    path = []
 
     for i in range(len(swaths_clipped_nonempty)-1):
         line1 = swaths_clipped_nonempty[i]
@@ -218,16 +231,16 @@ def generate_path(swaths_clipped_nonempty, turning_rad):
             heading2 += 180
 
         index = (i+1)%2
-
         pt1 = (line1_coords.iloc[index]['x'],line1_coords.iloc[index]['y'],90-heading1)
         pt2 = (line2_coords.iloc[index]['x'],line2_coords.iloc[index]['y'],90-heading2)
         path = dubins_main(pt1,pt2,turning_rad)
         curve1 = LineString(path[:,0:2])
-        line.append(gpd.GeoSeries((line1[0])))
-        line.append(gpd.GeoSeries(curve1))
-    line.append(gpd.GeoSeries(line2[0]))
+        path.append(gpd.GeoSeries((line1[0])))
+        path.append(gpd.GeoSeries(curve1))
 
-    return line
+    path.append(gpd.GeoSeries(line2[0]))
+
+    return path
 
 def interpolate_path(path,distance,base,no_offset):
     """
@@ -280,6 +293,7 @@ def interpolate_path(path,distance,base,no_offset):
             planting.append(len(path[i][0].coords)*[0])
             continue
     planting = [val for sublist in planting for val in sublist]
+
     return path,planting
         
 def path_to_df(best_path,command):
@@ -292,23 +306,12 @@ def path_to_df(best_path,command):
     returns: 
         df_best_path (pandas DataFrame): a dateframe with x and y coordinates of the best path
     """
-    coords = [x.get_coordinates() for x in best_path]
-    df = pd.concat(coords)
-    # Few lines of code to implement dummy planting commands
-    # sequence_len = 10
-    # zeros = [0]*sequence_len
-    # ones = [1]*sequence_len
 
-    # command = []
-    # while len(command)<= len(df):
-    #     command+=zeros
-    #     command+=ones
-    # command = command[:len(df)]
+    df = pd.concat([x.get_coordinates() for x in best_path])
     df['command'] = command
     df_best_path = df.set_index((np.arange(len(df))))
+
     return df_best_path
-
-
 
 def find_ref(swaths_clipped, field_headlands,slope):
     '''
@@ -360,8 +363,6 @@ def find_ref(swaths_clipped, field_headlands,slope):
 def plantseeds(best_path,field,field_headlands,planter_width,seed_distance):
     seed_lines = []
     seed_positions = []
-    # swath_vector = LineString([[0,0],[best_path['x'].iloc[1]-best_path['x'].iloc[0],best_path['y'].iloc[1]-best_path['y'].iloc[0]]])
-    # swath_normal = LineString([[0,0],[swath_vector.coords[1][1]/swath_vector.length*planter_width,-swath_vector.coords[1][0]/swath_vector.length*planter_width]])
     distances = np.arange(0,planter_width+seed_distance,seed_distance)
     for index,row in best_path.iterrows():
         if row['command'] == 1:
@@ -373,13 +374,10 @@ def plantseeds(best_path,field,field_headlands,planter_width,seed_distance):
             seed_positions.append([seed_lines[index].interpolate(distance) for distance in distances])
         else:
             seed_lines.append(None)
-            # print('HI')
     seed_positions = shapely.MultiPoint([val for sublist in seed_positions for val in sublist])
     return seed_lines, seed_positions
 
 
-from shapely import Point
-from shapely.ops import split, nearest_points
 def path_headlands(headland_size,tractor_width,turning_rad,field,interp_distance = 10):
     nr_passes_needed = headland_size//tractor_width
     paths_list = []
@@ -414,10 +412,7 @@ def connect_headlands(headland_paths,best_path,turning_rad):
             end_point = Point(result_list[-1].get_coordinates().iloc[-1])
         _,closest_point  = nearest_points(end_point,headland_paths[-1-i])
         
-
-        
         result = split(headland_paths[-1-i],closest_point.buffer(0.1))
-        # print(result)
 
         pt1 = (end_point.x,end_point.y,heading1)
         pt2 = (result.geoms[1].coords[0][0],result.geoms[1].coords[0][1],180)
@@ -430,12 +425,10 @@ def connect_headlands(headland_paths,best_path,turning_rad):
         result_list.append(gpd.GeoSeries(result.geoms[2]))
         result_list.append(gpd.GeoSeries(result.geoms[0]))
         command_list.append([1]*(len(result.geoms[1].coords)+len(result.geoms[2].coords)+len(result.geoms[0].coords)))
-        # print(len(command_list))
+
     command_list = [val for sublist in command_list for val in sublist]
     len_list = [len(result.get_coordinates()) for result in result_list]
-    # print(sum(len_list))
-    # print(len_list)
-    # print(len(command_list))
+
     df = path_to_df(result_list,command_list)
     return df
 
@@ -575,7 +568,7 @@ def check_alignment(sp,grid_hor,grid_ver,seed_count,margin = 0.01,full_score = F
     score = sum(results)/len(hor_aligned)
     return score
 
-def pathplanning(data_path,include_obs,turning_rad,distance,plotting,headland_size, interpolation_dist,seed_distance,no_offset = False):
+def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting, interpolation_dist,seed_distance,no_offset = False):
     """
     main function for the pathplanning, loads the data and generates a path (maybe its better to make this a class but idk)
     
@@ -584,9 +577,8 @@ def pathplanning(data_path,include_obs,turning_rad,distance,plotting,headland_si
         include_obs (bool): boolean to indicate if you want to include the obstacles in the 
                             resulting field (will probably be usefull for some debugging)
         turning_rad (float): turning radius of the tractor in m
-        distance (float): distance between swaths in m
+        tractor_width (float): tractor width (same as distance between swaths) in m
         plotting (bool): boolean to decide whether you want to plot the generated path or not
-        headland_size (float): size of the headlands in m
         interpolation_dist (float): the distance between points in the straight line segment
 
     returns:
@@ -595,10 +587,11 @@ def pathplanning(data_path,include_obs,turning_rad,distance,plotting,headland_si
 
     """
     field = load_data(data_path,include_obs) 
-    field_headlands = generate_headlands(field,headland_size)
-    coordinates = field_headlands.get_coordinates()
+    field_headlands, headland_size = generate_headlands(field,turning_rad,tractor_width)
+    coordinates = field.get_coordinates()
+    coordinates_headlands = field_headlands.get_coordinates()
     lines = edge_to_line(coordinates)
-    headland_path = path_headlands(headland_size,distance,turning_rad,field,interpolation_dist)
+    headland_path = path_headlands(headland_size,tractor_width,turning_rad,field,interpolation_dist)
     print(len(headland_path))
     # Initialize emtpy lists to contain the generated paths and path lengths
     paths = [] 
@@ -607,27 +600,20 @@ def pathplanning(data_path,include_obs,turning_rad,distance,plotting,headland_si
     sp_list = []
     bases = []
     score_list = []
-    print(coordinates)
+  
     for i in range(len(coordinates)-1): # Loop over all of the edges
         print('Finding path {}/{}'.format(i,len(coordinates)-1))
         try:
             # Calculate the basis AB line, use that to fill the field and clip the swaths
-            line,slope = basis_AB_line(lines.iloc[i],coordinates)
+            line,slope = basis_AB_line(lines.iloc[i],coordinates_headlands)
             
-            swath_list = fill_field_AB(line,slope,coordinates,distance)
+            swath_list = fill_field_AB(line,slope,coordinates,tractor_width)
             
             swaths_clipped = clip_swaths(swath_list,field_headlands)
-            
-            # If the paths have a negative slope, the heading is off by 180 degrees, this messes up the curves, so this offset is introduced
-            if slope > 0:
-                offset = 0
-            else:
-                offset = 180
             
             # Make a path with dubins curves
             path = generate_path(swaths_clipped,turning_rad)
             base = find_ref(swaths_clipped,field_headlands,slope)
-            # print(type(base))
 
             bases.append(base)
             # Interpolate the path with some specified distance
@@ -643,10 +629,9 @@ def pathplanning(data_path,include_obs,turning_rad,distance,plotting,headland_si
             # total_path_no_dupl = total_path_no_dupl.set_index(np.arange(len(total_path_no_dupl)))
             
             
-
-            sl,sp= plantseeds(total_path_no_dupl,field,field_headlands,distance,seed_distance)
+            _,sp= plantseeds(total_path_no_dupl,field,field_headlands,tractor_width,seed_distance)
             sp_list.append(sp)
-            grid_hor,grid_ver,seed_count = create_grid(sp,seed_distance,distance,interpolation_dist)
+            grid_hor,grid_ver,seed_count = create_grid(sp,seed_distance,tractor_width,interpolation_dist)
             grid_hor_prepped = shapely.prepared.prep(grid_hor)
             grid_ver_prepped = shapely.prepared.prep(grid_ver)
             score =  check_alignment(sp,grid_hor_prepped,grid_ver_prepped,seed_count,margin = 0.01,full_score = False)
@@ -673,8 +658,7 @@ def pathplanning(data_path,include_obs,turning_rad,distance,plotting,headland_si
             
 
     # Finding the path with the best measure
-    
-    sp_lengths = [len(gpd.GeoSeries(sp).get_coordinates()) for sp in sp_list]
+    seeds_no = [len(gpd.GeoSeries(sp).get_coordinates()) for sp in sp_list] # total number of seeds for different paths
     best_path_index =   np.argmax(np.array(score_list)) # for now the measure is total seed count
     best_path = paths[best_path_index]
     command = commands[best_path_index]
@@ -696,14 +680,13 @@ def pathplanning(data_path,include_obs,turning_rad,distance,plotting,headland_si
 
 
 
-data_path ="./data/field_geometry/test_4.json"
+data_path ="./data/field_geometry/test_2.json"
 include_obs = False
 turning_rad = 10
-distance = 20
-headland_size = 40
+tractor_width = 20
 interpolation_dist = 5
 
-field, field_headlands, best_path,sp,swaths_clipped,base, total_path, bases = pathplanning(data_path,include_obs,turning_rad,distance,True,headland_size,interpolation_dist,1,False)
+field, field_headlands, best_path,sp,swaths_clipped,base, total_path, bases = pathplanning(data_path,include_obs,turning_rad,tractor_width,True,interpolation_dist,1,False)
 
 
 
