@@ -23,7 +23,8 @@ def predict_field(image, conf_model):
     combined_mask = Image.new(
         "RGB", (mask_array.shape[2], mask_array.shape[1]), color=(255, 255, 255)
     )
-
+    print("Mask size: ",combined_mask.size)
+    combined_mask.save("filter/mask_image.png")
     # Iterate through each mask
     for idx, mask in enumerate(mask_array):
         # Convert mask to PIL image
@@ -82,8 +83,8 @@ def predict_json(scale,approx):
             result = []
             for i in approx_polygon:
                 temp = list(i[0])
-                temp[0] /= W  # Normalize x-coordinate
-                temp[1] /= H  # Normalize y-coordinate
+                temp[0] /= 1  # Normalize x-coordinate
+                temp[1] /= 1  # Normalize y-coordinate
                 result.append(temp)
 
             # If the contour is not empty, save it as a closed polygon
