@@ -7,13 +7,13 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 import math
-from dubins_curves import *
+from .dubins_curves import *
 import shapely.affinity
 from shapely import Point
 from shapely.ops import split, nearest_points
 
 
-def load_data(filepath,include_obstacles = False):
+def load_data(filepath,include_obstacles = False,scale_pixels:int=1):
     """
     function to load json file and create polygon object
 
@@ -33,7 +33,7 @@ def load_data(filepath,include_obstacles = False):
     polygons = []
     for i in range(len(json_data['features'])):
         coordinates.append(json_data['features'][i]['geometry']['coordinates'])
-        polygons.append(gpd.GeoSeries(Polygon(coordinates[i][0])))
+        polygons.append(gpd.GeoSeries(Polygon(coordinates[i][0])).scale(scale_pixels,scale_pixels))
     
     field = polygons[0]
     if include_obstacles:
@@ -587,6 +587,10 @@ def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting, inter
 
     """
     field = load_data(data_path,include_obs) 
+    fig, ax = plt.subplots()
+    field.plot(ax=ax, color='lightblue', edgecolor='black')
+    plt.savefig("filter/path_plot.png")
+
     field_headlands, headland_size = generate_headlands(field,turning_rad,tractor_width)
     coordinates = field.get_coordinates()
     coordinates_headlands = field_headlands.get_coordinates()
@@ -658,8 +662,10 @@ def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting, inter
             
 
     # Finding the path with the best measure
+
     seeds_no = [len(gpd.GeoSeries(sp).get_coordinates()) for sp in sp_list] # total number of seeds for different paths
     best_path_index =   np.argmax(np.array(score_list)) # for now the measure is total seed count
+
     best_path = paths[best_path_index]
     command = commands[best_path_index]
     # Converting path to df
@@ -674,10 +680,9 @@ def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting, inter
         field.plot(ax = ax,color = 'g')
         field_headlands.boundary.plot(ax = ax,color = 'r')
         best_path.plot(x = 'x', y = 'y',ax = ax,color = 'magenta',marker = 'o',markersize = 1)
-        plt.show()
+        plt.savefig("filter/path_field.png")
     
     return field,field_headlands,best_path,sp, swaths_clipped,base, total_path, bases
-
 
 
 data_path ="./data/field_geometry/test_2.json"
@@ -687,6 +692,7 @@ tractor_width = 20
 interpolation_dist = 5
 
 field, field_headlands, best_path,sp,swaths_clipped,base, total_path, bases = pathplanning(data_path,include_obs,turning_rad,tractor_width,True,interpolation_dist,1,False)
+
 
 
 
