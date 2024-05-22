@@ -233,8 +233,8 @@ def generate_path(swaths_clipped_nonempty, turning_rad):
         index = (i+1)%2
         pt1 = (line1_coords.iloc[index]['x'],line1_coords.iloc[index]['y'],90-heading1)
         pt2 = (line2_coords.iloc[index]['x'],line2_coords.iloc[index]['y'],90-heading2)
-        path = dubins_main(pt1,pt2,turning_rad)
-        curve1 = LineString(path[:,0:2])
+        curve = dubins_main(pt1,pt2,turning_rad)
+        curve1 = LineString(curve[:,0:2])
         path.append(gpd.GeoSeries((line1[0])))
         path.append(gpd.GeoSeries(curve1))
 
@@ -248,50 +248,45 @@ def interpolate_path(path,distance,base,no_offset):
     args:
         path (list): list of geopandas Geoseries objects that describe the path
         distance (float): distance between interpolated points
+        base (LineString): reference line for planting seeds 
+        no_offset (bool): boolean to indicate whether the seeds need to be aligned, if False, seeds will be aligned
+
 
     returns:
         path (list): list of geopandas Geoseries objects that has the same length as the input, 
                         but each straight line segment is split into more pieces
+        planting (list): 
     """
     planting = []
     
     for i in range(len(path)): # Loop over the list of path segments
         if i%2 == 0: # We always start the path with a straight line, and then turns and straight lines alternate, so each even entry in the list is a straight line segment
+            line = path[i][0]
             if i%4 ==0: # Every second straight line segment has to be reversed; each vector has the same direction, but the tractor
                         #should drive back and forth, so each 4th element in the row (every second straight path) reversed and then interpolated
-                line = path[i][0]
-                
-                begin = Point(line.coords[0])
-                
-                distance_from_base  = begin.distance(base)
-                
-                offset = distance - distance_from_base%distance 
+                begin = Point(line.coords[0]) # beginning of the straight line on tractor's path
+                distance_from_base  = begin.distance(base) # distance from the reference line
+                offset = distance - distance_from_base%distance # how much the seeding needs to be offset to make the seeds aligned
                 if no_offset:
                     offset = 0
-                distances = np.arange(offset,line.length,distance)
-                
-                interpolated_path = LineString([line.interpolate(distance) for distance in distances])
-                
-                length = len(interpolated_path.coords)
-                
-                path[i] = gpd.GeoSeries(interpolated_path)
-                planting.append([1]*length)
+                distances = np.arange(offset,line.length,distance) # distances between the placed seeds and the beginning of the seed grid
             else:
-                line = path[i][0]
-                begin = Point(line.coords[1])
+                begin = Point(line.coords[1]) # beginning of the straight line on tractor's path - the other direction than the previous one
                 distance_from_base  = begin.distance(base)
-                offset = distance_from_base%distance 
+                offset = distance_from_base%distance # the other way than the previous line
                 if no_offset:
                     offset = 0
-                distances = np.arange(line.length-offset,0,-distance)
-                interpolated_path = LineString([line.interpolate(distance) for distance in distances])
-                
-                length = len(interpolated_path.coords)
-                path[i] = gpd.GeoSeries(interpolated_path)
-                planting.append([1]*length)
+                distances = np.arange(line.length-offset,0,-distance) # the other way than the previous line
+
+            interpolated_path = LineString([line.interpolate(distance) for distance in distances])
+            length = len(interpolated_path.coords)
+            path[i] = gpd.GeoSeries(interpolated_path)
+            planting.append([1]*length)
+
         else: # Don't do anything if we have an odd index, those correspond to turns which are already interpolated. 
             planting.append(len(path[i][0].coords)*[0])
             continue
+
     planting = [val for sublist in planting for val in sublist]
 
     return path,planting
@@ -684,9 +679,12 @@ data_path ="./data/field_geometry/test_2.json"
 include_obs = False
 turning_rad = 10
 tractor_width = 20
-interpolation_dist = 5
+turning_rad = 4
+tractor_width = 3
+interpolation_dist = 0.5
+seed_distance = 1
 
-field, field_headlands, best_path,sp,swaths_clipped,base, total_path, bases = pathplanning(data_path,include_obs,turning_rad,tractor_width,True,interpolation_dist,1,False)
+field, field_headlands, best_path,sp,swaths_clipped,base, total_path, bases = pathplanning(data_path,include_obs,turning_rad,tractor_width,True,interpolation_dist,seed_distance,False)
 
 
 
