@@ -255,7 +255,7 @@ def interpolate_path(path,distance,base,no_offset):
     returns:
         path (list): list of geopandas Geoseries objects that has the same length as the input, 
                         but each straight line segment is split into more pieces
-        planting (list): 
+            planting (list): list of 0s and 1s indicating if we plant seeds in a given point or not
     """
     planting = []
     
@@ -278,16 +278,20 @@ def interpolate_path(path,distance,base,no_offset):
                     offset = 0
                 distances = np.arange(line.length-offset,0,-distance) # the other way than the previous line
 
-            interpolated_path = LineString([line.interpolate(distance) for distance in distances])
+            try: # if the line is long enough to interpolate
+                interpolated_path = LineString([line.interpolate(distance) for distance in distances])
+            except: # if the line is not long enough to interpolate, keep the line as it is
+                interpolated_path = line
+
             length = len(interpolated_path.coords)
             path[i] = gpd.GeoSeries(interpolated_path)
-            planting.append([1]*length)
+            planting.append([1]*length) # 1 means we plant in this spot
 
         else: # Don't do anything if we have an odd index, those correspond to turns which are already interpolated. 
-            planting.append(len(path[i][0].coords)*[0])
+            planting.append(len(path[i][0].coords)*[0]) # 0 means we don't plant in this spot
             continue
 
-    planting = [val for sublist in planting for val in sublist]
+    planting = [val for sublist in planting for val in sublist] # flatten the list of 0s and 1s indicating if we plant or not
 
     return path,planting
         
@@ -309,79 +313,100 @@ def path_to_df(best_path,command):
     return df_best_path
 
 def find_ref(swaths_clipped, field_headlands,slope):
-    '''
-    Finding a reference line for the seed positions. The grid will be constant with respect to this line
+    """
+    Finds a reference line for the seed positions. The grid will be constant with respect to this line
 
     args: 
-        swaths_clipped (list): list of the clipped swaths that cover the field (a list of linestrings)
+        swaths_clipped (list geopandas.GeoSeries): list of the clipped swaths that cover the field
         field_headlands (geopandas.GeoSeries): a geoseries objec that defines the field after substracting the healands
         slope (float): a float that describes the slope of the swaths
-    '''
+
+    returns:
+        reference line scaled to cover the whole field 
+    """ 
+
     # If the slope is > 1, we have a 'steep' swath and we need it's minimum y, otherwise use min x
-    if np.abs(slope)>=1:
+    if np.abs(slope)>=1 or np.isnan(slope):
         # Make a list of starting coordinates for all swaths, we then take the minimum of those values generate a line that is normal to the swaths
         start_y = [item[0].coords[0][1] for item in swaths_clipped]
         index = np.argmin(np.array(start_y))
-        reference_swath = swaths_clipped[index]
-        # Rotate the swath with 90 degrees around it starting point
-        reference_normal = shapely.affinity.rotate(reference_swath[0],90,origin= Point(reference_swath[0].coords[1]))
-        
     else:
         # Make a list of starting coordinates for all swaths, we then take the minimum of those values generate a line that is normal to the swaths
         start_x = [item[0].coords[0][0] for item in swaths_clipped]
         index = np.argmin(np.array(start_x))
-        reference_swath = swaths_clipped[index]
-        # Rotate the swath with 90 degrees around it starting point
-        reference_normal = shapely.affinity.rotate(reference_swath[0],90,origin= Point([reference_swath[0].coords[1][0],reference_swath[0].coords[1][1]]))
+        
+    reference_swath = swaths_clipped[index] # get the reference swath and rotate it by 90 degrees around its starting point
+    reference_normal = shapely.affinity.rotate(reference_swath[0],90,origin= Point(reference_swath[0].coords[1]))
 
-    # Calculating the width and heigth of the field to find the factor with which we have to scale the reference line
-    # To make sure it covers the entire field
+    # Calculate the width and heigth of the field to find the factor with which we have to scale the reference line to make sure it covers the entire field
     field_width = np.max(field_headlands.boundary[0].xy[0])-np.min(field_headlands.boundary[0].xy[0])
     field_heigth = np.max(field_headlands.boundary[0].xy[1])-np.min(field_headlands.boundary[0].xy[1])
-    fraction = np.max([field_width,field_heigth])
-    
-    
+    scale_factor = np.max([field_width,field_heigth])
 
     # If we have a steep slope, we move the reference downwards to make sure it is outside the field
     # Otherwise we move it to the left for the same reason
-    if np.abs(slope)>=1:
-        print(field_heigth)
+    if np.abs(slope)>=1 or np.isnan(slope):
         reference_normal = shapely.affinity.translate(reference_normal,0,-field_heigth)
     else:
         reference_normal =  shapely.affinity.translate(reference_normal,-field_width,0)
 
     # Scale the ref line with the factor defined above
-    return shapely.affinity.scale(reference_normal,xfact = fraction,yfact = fraction)
+    return shapely.affinity.scale(reference_normal,xfact = scale_factor,yfact = scale_factor)
 
 
+def plantseeds(best_path,tractor_width,seed_distance):
+    """ 
+    Finds the lines in which seeds are planted and exact seed positions.
 
-def plantseeds(best_path,field,field_headlands,planter_width,seed_distance):
+    args:
+        best_path (pandas DataFrame): a dateframe with x and y coordinates of the best path and 'command' indicating if the seeds are planted (1) or not (0) in the given point
+        tractor_width (float): the width of the tractor in m
+        seed_distance: distance between each neighbouring seed within one line of seeds planted at once 
+
+    returns:
+        seed_lines (list of LineStrings and None): list of the lines of seeds planted at once, or None corresponding to the 'command' for each point in tractor's path
+        seed_positions (list of MultiPoints): positions of each seed within a line of seeds
+    """
+
     seed_lines = []
     seed_positions = []
-    distances = np.arange(0,planter_width+seed_distance,seed_distance)
+    distances = np.arange(0,tractor_width+seed_distance,seed_distance) # distances between seeds within one tractor width
+
     for index,row in best_path.iterrows():
-        if row['command'] == 1:
+        if row['command'] == 1: # if we are supposed to plant in a given place
             if index == len(best_path)-1:
                 continue
-            swath_vector = LineString([[0,0],[best_path['x'].iloc[index+1]-best_path['x'].iloc[index],best_path['y'].iloc[index+1]-best_path['y'].iloc[index]]])
-            swath_normal = LineString([[-swath_vector.coords[1][1]/swath_vector.length*planter_width/2,swath_vector.coords[1][0]/swath_vector.length*planter_width/2],[swath_vector.coords[1][1]/swath_vector.length*planter_width/2,-swath_vector.coords[1][0]/swath_vector.length*planter_width/2]])
+            swath_vector = LineString([[0,0],[best_path['x'].iloc[index+1]-best_path['x'].iloc[index],
+                                              best_path['y'].iloc[index+1]-best_path['y'].iloc[index]]]) # vector for the
+            swath_normal = LineString([[-swath_vector.coords[1][1]/swath_vector.length*tractor_width/2,
+                                        swath_vector.coords[1][0]/swath_vector.length*tractor_width/2],
+                                        [swath_vector.coords[1][1]/swath_vector.length*tractor_width/2,
+                                         -swath_vector.coords[1][0]/swath_vector.length*tractor_width/2]]) # planting is perpendicular to the line of the tractor and on both sides of the tractor 
             seed_lines.append(shapely.affinity.translate(swath_normal,row['x'],row['y']))
             seed_positions.append([seed_lines[index].interpolate(distance) for distance in distances])
         else:
             seed_lines.append(None)
-    seed_positions = shapely.MultiPoint([val for sublist in seed_positions for val in sublist])
+
+    seed_positions = shapely.MultiPoint([val for sublist in seed_positions for val in sublist]) # flatten the list of seed positions
+    
     return seed_lines, seed_positions
 
 
-def path_headlands(headland_size,tractor_width,turning_rad,field,interp_distance = 10):
+def path_headlands(headland_size,tractor_width,turning_rad,field,interp_distance):
+
+
     nr_passes_needed = headland_size//tractor_width
     paths_list = []
+
+
     for i in range(nr_passes_needed):
         path = field.buffer(-1*(tractor_width/2+i*tractor_width))
         path_rounded_edge = path.buffer(turning_rad).buffer(-2*turning_rad).buffer(turning_rad)
         distances = np.arange(0,int(path_rounded_edge.length),interp_distance)
         interpolated = LineString([path_rounded_edge[0].boundary.interpolate(distance) for distance in distances])
         paths_list.append(interpolated)
+
+
     return paths_list
 
 def connect_headlands(headland_paths,best_path,turning_rad):
@@ -541,18 +566,18 @@ def check_alignment(sp,grid_hor,grid_ver,seed_count,margin = 0.01,full_score = F
     fig, ax = plt.subplots(1,3,figsize = (15,5))
     for (v,c) in [(True,'b'),(False,'r')]: # Colors based on whether a seed is on the grid or not
         ax[0].plot(sp_df.x[sp_df.on_grid_hor == v],sp_df.y[sp_df.on_grid_hor == v],'o',markersize = 1)
-    ax[0].set_xlim([250,620])
-    ax[0].set_ylim([00,600])
+    # ax[0].set_xlim([250,620])
+    # ax[0].set_ylim([00,600])
     ax[0].legend(['Aligned', 'Misaligned'])
     for (v,c) in [(True,'b'),(False,'r')]:
         ax[1].plot(sp_df.x[sp_df.on_grid_ver == v],sp_df.y[sp_df.on_grid_ver == v],'o',markersize = 1)
-    ax[1].set_xlim([250,620])
-    ax[1].set_ylim([00,600])
+    # ax[1].set_xlim([250,620])
+    # ax[1].set_ylim([00,600])
     ax[1].legend(['Aligned', 'Misaligned'])
     for (v,c) in [(True,'b'),(False,'r')]:
         ax[2].plot(sp_df.x[sp_df.on_grid == v],sp_df.y[sp_df.on_grid == v],'o',markersize = 1)
-    ax[2].set_xlim([250,620])
-    ax[2].set_ylim([00,600])
+    # ax[2].set_xlim([250,620])
+    # ax[2].set_ylim([00,600])
     ax[1].legend(['Aligned', 'Misaligned'])
 
     ax[0].set_title('horizontal alignment')
@@ -587,7 +612,7 @@ def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting, inter
     coordinates_headlands = field_headlands.get_coordinates()
     lines = edge_to_line(coordinates)
     headland_path = path_headlands(headland_size,tractor_width,turning_rad,field,interpolation_dist)
-    print(len(headland_path))
+    
     # Initialize emtpy lists to contain the generated paths and path lengths
     paths = [] 
     commands = []
@@ -624,7 +649,7 @@ def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting, inter
             # total_path_no_dupl = total_path_no_dupl.set_index(np.arange(len(total_path_no_dupl)))
             
             
-            _,sp= plantseeds(total_path_no_dupl,field,field_headlands,tractor_width,seed_distance)
+            _,sp= plantseeds(total_path_no_dupl,tractor_width,seed_distance)
             sp_list.append(sp)
             grid_hor,grid_ver,seed_count = create_grid(sp,seed_distance,tractor_width,interpolation_dist)
             grid_hor_prepped = shapely.prepared.prep(grid_hor)
@@ -665,7 +690,7 @@ def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting, inter
     
     # Plot the path if it is specified
     if plotting:
-        fig, ax = plt.subplots()
+        _, ax = plt.subplots()
         field.plot(ax = ax,color = 'g')
         field_headlands.boundary.plot(ax = ax,color = 'r')
         best_path.plot(x = 'x', y = 'y',ax = ax,color = 'magenta',marker = 'o',markersize = 1)
