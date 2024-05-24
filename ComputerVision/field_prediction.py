@@ -10,6 +10,8 @@ import json
 
 
 def predict_field(image, conf_model):
+    # Display the combined mask image
+    os.makedirs("filter", exist_ok=True)
     my_model = YOLO("best.pt")
     results = list(
         my_model(image, conf=conf_model, save_json=True)
@@ -83,8 +85,8 @@ def predict_json(scale,approx):
             result = []
             for i in approx_polygon:
                 temp = list(i[0])
-                temp[0] /= 1  # Normalize x-coordinate
-                temp[1] /= 1  # Normalize y-coordinate
+                temp[0] /= 1  # Can be used to normalize the pixels. But is deprecated because of the scaling
+                temp[1] /= 1  # Can be used to normalize the pixels. But is deprecated because of the scaling
                 result.append(temp)
 
             # If the contour is not empty, save it as a closed polygon

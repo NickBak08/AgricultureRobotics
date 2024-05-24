@@ -213,7 +213,7 @@ class PID_Speed:
         self.previous_error = 0
         self.last_time = None
 
-def path_tracking(refer_path, speed, iteration_limit, stop_threshold=1,angle_tolerance=np.deg2rad(30)):
+def path_tracking(refer_path, speed, iteration_limit, stop_threshold=1,angle_tolerance=np.deg2rad(70)):
     """
     Use PID controller to track the reference path
     
@@ -340,7 +340,8 @@ def path_tracking(refer_path, speed, iteration_limit, stop_threshold=1,angle_tol
     plt.xlabel('X')  
     plt.ylabel('Y') 
     plt.title('Path Tracking') 
-    plt.show()
+    plt.savefig("filter/simulation_field.png")
+    #plt.show()
     
     # plt.figure(figsize=(8, 4))
     # plt.plot(velocities, '-b', label='Velocity')
@@ -352,8 +353,8 @@ def path_tracking(refer_path, speed, iteration_limit, stop_threshold=1,angle_tol
     # plt.show()
     return position
 
-data_path ='D:/5ARIP10 Team Project/working space/AgricultureRobotics/Simulation/bestpath.csv'
-speed = 3.75
-iteration_limit = 30000
-refer_path = pd.read_csv(data_path)
-actual_path = path_tracking(refer_path, speed, iteration_limit, stop_threshold=0.5)
+# data_path ='D:/5ARIP10 Team Project/working space/AgricultureRobotics/Simulation/bestpath.csv'
+# speed = 3.75
+# iteration_limit = 30000
+# refer_path = pd.read_csv(data_path)
+# actual_path = path_tracking(refer_path, speed, iteration_limit, stop_threshold=0.5)

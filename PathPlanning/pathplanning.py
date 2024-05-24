@@ -209,7 +209,7 @@ def clip_swaths(swath_list,field):
 
 def generate_path(swaths_clipped_nonempty, turning_rad):
 
-    path = []
+    line = []
 
     for i in range(len(swaths_clipped_nonempty)-1):
         line1 = swaths_clipped_nonempty[i]
@@ -235,12 +235,12 @@ def generate_path(swaths_clipped_nonempty, turning_rad):
         pt2 = (line2_coords.iloc[index]['x'],line2_coords.iloc[index]['y'],90-heading2)
         path = dubins_main(pt1,pt2,turning_rad)
         curve1 = LineString(path[:,0:2])
-        path.append(gpd.GeoSeries((line1[0])))
-        path.append(gpd.GeoSeries(curve1))
+        line.append(gpd.GeoSeries((line1[0])))
+        line.append(gpd.GeoSeries(curve1))
 
-    path.append(gpd.GeoSeries(line2[0]))
+    line.append(gpd.GeoSeries(line2[0]))
 
-    return path
+    return line
 
 def interpolate_path(path,distance,base,no_offset):
     """
@@ -610,30 +610,33 @@ def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting, inter
         try:
             # Calculate the basis AB line, use that to fill the field and clip the swaths
             line,slope = basis_AB_line(lines.iloc[i],coordinates_headlands)
+            print("Finish basis_AB_line")
             
             swath_list = fill_field_AB(line,slope,coordinates,tractor_width)
-            
+            print("Finish fill_field_AB")
             swaths_clipped = clip_swaths(swath_list,field_headlands)
-            
+            print("Finish clip_swaths")
             # Make a path with dubins curves
             path = generate_path(swaths_clipped,turning_rad)
+            print("Finish generate_path")
             base = find_ref(swaths_clipped,field_headlands,slope)
-
+            print("Finish find_ref")
             bases.append(base)
             # Interpolate the path with some specified distance
             path, command = interpolate_path(path,interpolation_dist,base,no_offset)
-
+            print("Finish interpolate_path")
             path_df = path_to_df(path,command)
-
+            print("Finish path_to_df")
             headlands_path_connected = connect_headlands(headland_path,path_df,turning_rad)
             # print(headlands_path_connected.iloc[0])
-
+            print("Finish connect_headlands")
             total_path = pd.concat([path_df,headlands_path_connected])
             total_path_no_dupl = total_path.drop_duplicates(['x','y'] ,ignore_index = True)
             # total_path_no_dupl = total_path_no_dupl.set_index(np.arange(len(total_path_no_dupl)))
             
             
             _,sp= plantseeds(total_path_no_dupl,field,field_headlands,tractor_width,seed_distance)
+            print("Finish plantseeds")
             sp_list.append(sp)
             grid_hor,grid_ver,seed_count = create_grid(sp,seed_distance,tractor_width,interpolation_dist)
             grid_hor_prepped = shapely.prepared.prep(grid_hor)
@@ -685,13 +688,13 @@ def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting, inter
     return field,field_headlands,best_path,sp, swaths_clipped,base, total_path, bases
 
 
-data_path ="./data/field_geometry/test_2.json"
-include_obs = False
-turning_rad = 10
-tractor_width = 20
-interpolation_dist = 5
+# data_path ="./data/field_geometry/test_2.json"
+# include_obs = False
+# turning_rad = 10
+# tractor_width = 20
+# interpolation_dist = 5
 
-field, field_headlands, best_path,sp,swaths_clipped,base, total_path, bases = pathplanning(data_path,include_obs,turning_rad,tractor_width,True,interpolation_dist,1,False)
+# field, field_headlands, best_path,sp,swaths_clipped,base, total_path, bases = pathplanning(data_path,include_obs,turning_rad,tractor_width,True,interpolation_dist,1,False)
 
 
 

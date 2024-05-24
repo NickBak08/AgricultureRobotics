@@ -466,8 +466,8 @@ def track_path(refer_df, speed, iteration_limit):
     output_df = pd.DataFrame({
         'steering angle':output_delta
     })
-    input_df.to_csv('D:/5ARIP10 Team Project/working space/AgricultureRobotics/Simulation/input.csv',index=True)
-    output_df.to_csv('D:/5ARIP10 Team Project/working space/AgricultureRobotics/Simulation/output.csv',index=True)
+    # input_df.to_csv('D:/5ARIP10 Team Project/working space/AgricultureRobotics/Simulation/input.csv',index=True)
+    # output_df.to_csv('D:/5ARIP10 Team Project/working space/AgricultureRobotics/Simulation/output.csv',index=True)
     # Visualize the final result
     plt.figure(figsize=(8, 8))
     plt.plot(refer_df['x'], refer_df['y'], '-.b', linewidth=1.0, label='Reference Path')
@@ -478,8 +478,8 @@ def track_path(refer_df, speed, iteration_limit):
     plt.legend()
     plt.axis("equal")
     plt.grid(True)
-    plt.show()
-    plt.savefig('D:/5ARIP10 Team Project/working space/AgricultureRobotics/Simulation/path_tracking_result.png')
+    #plt.show()
+    plt.savefig("filter/simulation_field_mpc.png")
 
     return x_, y_ , measurement_accuracy
 
@@ -498,11 +498,11 @@ def path_tracking_result(data_path,speed,iteration_limit):
     path_df = store_path_data(x_, y_)
     return path_df
 
-data_path ='D:/5ARIP10 Team Project/working space/AgricultureRobotics/Simulation/bestpath.csv'
-speed = 5
-iteration_limit = 7000
+# data_path ='D:/5ARIP10 Team Project/working space/AgricultureRobotics/Simulation/bestpath.csv'
+# speed = 5
+# iteration_limit = 7000
 
-actual_path = path_tracking_result(data_path,speed,iteration_limit)
+# actual_path = path_tracking_result(data_path,speed,iteration_limit)
 
 
 

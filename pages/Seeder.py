@@ -2,7 +2,7 @@ import streamlit as st
 from ComputerVision.field_prediction import predict_field, predict_json, filter_json 
 from PathPlanning.pathplanning import pathplanning,load_data
 from Simulation.MPC_pathtracking import track_path
-from Simulation.pathtracking import path_tracking
+from Simulation.PID_pathtracking import path_tracking
 from PIL import Image
 import matplotlib.pyplot as plt
 import cv2
@@ -141,7 +141,7 @@ def plan_path():
     include_obs = False
     turning_rad = turning_radius
     distance = distance_AB
-    field, best_path = pathplanning(data_path,include_obs,turning_rad,distance,True,headland_size,2)
+    field,field_headlands,best_path,sp, swaths_clipped,base, total_path, bases = pathplanning(data_path=data_path,include_obs=include_obs,turning_rad=turning_rad,tractor_width=2,seed_distance=5,plotting=True,interpolation_dist=0.5)
     st.session_state['simulate_path'] = best_path
     st.session_state.clicked_path = True
     
@@ -161,7 +161,7 @@ option = st.selectbox("Which controller to use for simulation?",("PID","MPC"))
 def simulate_path():
     '''Callback function for simulating path button'''
     if option == "PID":
-        path_tracking(st.session_state['simulate_path'],velocity_model)
+        path_tracking(st.session_state['simulate_path'],velocity_model,iteration_number)
     elif option == "MPC":
         track_path(st.session_state['simulate_path'],velocity_model,iteration_number)
     st.session_state.clicked_simulation = True
