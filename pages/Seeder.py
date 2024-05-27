@@ -149,7 +149,7 @@ def select_field():
 
 # Parameters for selecting a field
 approximate_poly = st.number_input("Fine tune edges",value=0.001,on_change=select_field,step=0.001,min_value=0.0,key="approx",format="%.5f")
-field_number = st.number_input("Field_number",value=1,on_change=select_field,key="fieldnr")
+field_number = st.number_input("Field number",value=0,on_change=select_field,key="fieldnr")
 
 # When parameters are filled in show selected field
 if st.session_state.show_field:

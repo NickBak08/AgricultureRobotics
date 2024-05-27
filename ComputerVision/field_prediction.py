@@ -49,6 +49,7 @@ def predict_field(image, conf_model):
         # Display the combined mask image
         os.makedirs("test", exist_ok=True)
         combined_mask.save("test/test1.png")
+        combined_mask.save("filter/connected_bridge.png")
         return combined_mask
         # combined_mask.show()
 
@@ -134,16 +135,21 @@ def filter_json(field:int):
         contour1_features = [
             feature for feature in features if feature["properties"].get("Name") == f"field{str(field)}"
         ]
+        # Check if there is a field with this number
+        if contour1_features:
+            print("Found a field")
+            print(contour1_features)
+            # Create a new GeoJSON with the filtered features
+            filtered_geojson = {"type": "FeatureCollection", "features": contour1_features}
 
-        # Create a new GeoJSON with the filtered features
-        filtered_geojson = {"type": "FeatureCollection", "features": contour1_features}
-
-        # Save the new GeoJSON to a file
-        os.makedirs("filter", exist_ok=True)
-        with open("filter/filtered_geojson.json", "w") as f:
-            json.dump(filtered_geojson, f, indent=2)
+            # Save the new GeoJSON to a file
+            os.makedirs("filter", exist_ok=True)
+            with open("filter/filtered_geojson.json", "w") as f:
+                json.dump(filtered_geojson, f, indent=2)
+        else:
+            print("No field with this number")
     except:  # noqa: E722
-        print("Now field with this number")
+        print("No field with this number")
 
 def make_bridge(image,pixel1:int=1,pixel2:int=1,thickness_bridge:int=10):
     # Read the image
