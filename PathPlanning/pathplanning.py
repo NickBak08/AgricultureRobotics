@@ -250,10 +250,10 @@ def connect_paths(path1,path2,turning_rad):
         heading1 = 0     
     elif diff1['y'] == 0 and diff1['x']> 0: # If the line is horizontal, going left
         heading1 = 270
-    elif diff1['x'] <0: # if the heading is right (up or down), because atan is between -90 and 90
-        heading1 = 90-math.degrees(math.atan(diff1['y']/diff1['x']))
+    elif diff1['x'] >0 : # if the heading is right (up or down), because atan is between -90 and 90
+        heading1 = 270-math.degrees(math.atan(diff1['y']/diff1['x']))
     else: # if the heading is left (up or down), because atan is between -90 and 90
-        heading1 = 90+math.degrees(math.atan(diff1['y']/diff1['x']))
+        heading1 = 90-math.degrees(math.atan(diff1['y']/diff1['x']))
     
     diff2 = path2_coords.iloc[0]-path2_coords.iloc[1]
     if diff2['x'] == 0 and diff2['y']>0: # the line is vertical
@@ -262,10 +262,10 @@ def connect_paths(path1,path2,turning_rad):
         heading2 = 0
     elif diff2['y'] == 0 and diff2['x']> 0: # If the line is horizontal, going left
         heading2 = 270
-    elif diff2['x'] <0: # if the heading is right (up or down), because atan is between -90 and 90
-        heading2 = 90-math.degrees(math.atan(diff2['y']/diff2['x']))
+    elif diff2['x'] >0: # if the heading is right (up or down), because atan is between -90 and 90
+        heading2 = 270-math.degrees(math.atan(diff2['y']/diff2['x']))
     else: # if the heading is left (up or down), because atan is between -90 and 90
-        heading2 = 90+math.degrees(math.atan(diff2['y']/diff2['x']))
+        heading2 = 90-math.degrees(math.atan(diff2['y']/diff2['x']))
 
     # make the curve connecting the two points
     pt1 = (begin_point.x,begin_point.y,heading1)
@@ -642,8 +642,11 @@ def check_alignment(sp,grid_hor,grid_ver,seed_count,margin = 0.01,full_score = F
     seeds_to_check = [seed for index,seed in enumerate(sp.geoms) if index in index_seeds_to_check]
 
     # Check the alignment for all seeds for horizontal and vertical lines separately
-    hor_aligned = [grid_hor.intersects(seed.buffer(margin)) for seed in seeds_to_check]
-    ver_aligned = [grid_ver.intersects(seed.buffer(margin)) for seed in seeds_to_check]
+    hor_aligned_distances = [grid_hor.distance(seed) for seed in seeds_to_check]
+    ver_aligned_distances = [grid_ver.distance(seed) for seed in seeds_to_check]
+
+    hor_aligned = [dist<margin for dist in hor_aligned_distances]
+    ver_aligned = [dist<margin for dist in ver_aligned_distances]
 
     # Result is only true if a seed is on both the vertical and horizontal lies
     results = [hor_aligned[i] and ver_aligned[i] for i in range(len(hor_aligned))]
@@ -652,6 +655,8 @@ def check_alignment(sp,grid_hor,grid_ver,seed_count,margin = 0.01,full_score = F
     sp_df = gpd.GeoSeries(sp).get_coordinates().iloc[index_seeds_to_check]
     
     # Store the result in the dataframe for plotting
+    sp_df['hor_distance'] = hor_aligned_distances
+    sp_df['ver_distance'] = ver_aligned_distances
     sp_df['on_grid_ver'] = hor_aligned
     sp_df['on_grid_hor'] = ver_aligned
     sp_df['on_grid'] = results
@@ -675,7 +680,7 @@ def check_alignment(sp,grid_hor,grid_ver,seed_count,margin = 0.01,full_score = F
 
     score = sum(results)/len(hor_aligned)
 
-    return score
+    return score, sp_df
 
 def boustrophedon_decomposition(field,obstacles,base_ab,slope):
     """
@@ -701,7 +706,7 @@ def boustrophedon_decomposition(field,obstacles,base_ab,slope):
     if np.isnan(slope) == False:
         sweep_lines = [shapely.affinity.translate(base_ab,0,ytran) for ytran in np.arange(-miny,maxy,step_size)]
     else:
-        sweep_lines = [shapely.affinity.translate(base_ab,xtran,0) for xtran in np.arange(minx,maxx,step_size)]
+        sweep_lines = [shapely.affinity.translate(base_ab,xtran,0) for xtran in np.arange(-minx,maxx,step_size)]
     
     # Start with the original field, replace this later with the decomposed geometries
     decomposed_polygons = [field]
@@ -829,129 +834,174 @@ def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting,seed_d
     sp_list = []
     bases = []
     score_list = []
+    sp_df_list = []
   
     for i in range(len(coordinates)-1): # Loop over all of the edges
         print('Finding path {}/{}'.format(i,len(coordinates)-1))
-        # try:
-        # Calculate the basis AB line, use that to fill the field and clip the swaths
-        line,slope = basis_AB_line(lines.iloc[i],coordinates_headlands)
-        swath_list = fill_field_AB(line,slope,coordinates,tractor_width)
-        swaths_clipped = clip_swaths(swath_list,field_headlands)
-        base = find_ref(swaths_clipped,field_headlands,slope)
-        bases.append(base)
+        try:
+            # Calculate the basis AB line, use that to fill the field and clip the swaths
+            line,slope = basis_AB_line(lines.iloc[i],coordinates_headlands)
+            swath_list = fill_field_AB(line,slope,coordinates,tractor_width)
+            swaths_clipped = clip_swaths(swath_list,field_headlands)
+            base = find_ref(swaths_clipped,field_headlands,slope)
+            bases.append(base)
 
-        if include_obs:
-            try:
-                decomposed_polygons = boustrophedon_decomposition(field_headlands,obstacles,line,slope)
-                print('Decomposition completed')
-            except:
-                print('Decomposition failed')
-                continue
-        else:
-            decomposed_polygons = [field_headlands]
-            print('No decomposition performed')
-            
-        # At this point, we have found a direction in which we can drive if there are no obstacles present. We now have to make a new field
-        paths_subfields = []
-        commands_subfields = []
-        for index,decomposed_field in enumerate(decomposed_polygons):
-            decomposed_field = gpd.GeoSeries(decomposed_field) # Convert decomposed polygons to a geoseries object (and change the name to work in the rest of the functions)
-            swaths_clipped = clip_swaths(swath_list,decomposed_field)
-            # Make a path with dubins curves
-            path_new = generate_path(swaths_clipped,turning_rad)
-            # Interpolate the path with some specified distance
-            path_new, command_new = interpolate_path(path_new,seed_distance,base,no_offset)
-            
-            if index == 0:
-                paths_subfields = [path_new]
-                commands_subfields = [command_new]
+            if include_obs:
+                try:
+                    decomposed_polygons = boustrophedon_decomposition(field_headlands,obstacles,line,slope)
+                    print('Decomposition completed')
+                except:
+                    print('Decomposition failed')
+                    continue
+            else:
+                decomposed_polygons = [field_headlands]
+                print('No decomposition performed')
+                
+            # At this point, we have found a direction in which we can drive if there are no obstacles present. We now have to make a new field
+            paths_subfields = []
+            commands_subfields = []
+            for index,decomposed_field in enumerate(decomposed_polygons):
+                decomposed_field = gpd.GeoSeries(decomposed_field) # Convert decomposed polygons to a geoseries object (and change the name to work in the rest of the functions)
+                swaths_clipped = clip_swaths(swath_list,decomposed_field)
+                # Make a path with dubins curves
+                path_new = generate_path(swaths_clipped,turning_rad)
+                # Interpolate the path with some specified distance
+                path_new, command_new = interpolate_path(path_new,seed_distance,base,no_offset)
+                
+                if index == 0:
+                    paths_subfields = [path_new]
+                    commands_subfields = [command_new]
+                    path_old = path_new
+                    continue
+
+                connecting_curve = [gpd.GeoSeries(connect_paths(path_old[-1],path_new[0],turning_rad))]
+                paths_subfields.append(connecting_curve)
+                paths_subfields.append(path_new)
+                commands_subfields.append(len(connecting_curve[0].get_coordinates())*[0])
+                commands_subfields.append(command_new)
                 path_old = path_new
-                continue
+                command_old = command_new
 
-            connecting_curve = [gpd.GeoSeries(connect_paths(path_old[-1],path_new[0],turning_rad))]
-            paths_subfields.append(connecting_curve)
-            paths_subfields.append(path_new)
-            commands_subfields.append(len(connecting_curve[0].get_coordinates())*[0])
-            commands_subfields.append(command_new)
-            path_old = path_new
-            command_old = command_new
+            paths_subfields = [val for sublist in paths_subfields for val in sublist]
+            commands_subfields = [val for sublist in commands_subfields for val in sublist]
+            # print(paths_subfields)
+            path_df = path_to_df(paths_subfields,commands_subfields)
+            headlands_path_connected = generate_connect_headlands(field,paths_subfields,tractor_width,turning_rad,headland_size,seed_distance)
 
-        paths_subfields = [val for sublist in paths_subfields for val in sublist]
-        commands_subfields = [val for sublist in commands_subfields for val in sublist]
-        # print(paths_subfields)
-        path_df = path_to_df(paths_subfields,commands_subfields)
-        headlands_path_connected = generate_connect_headlands(field,paths_subfields,tractor_width,turning_rad,headland_size,seed_distance)
+            total_path = pd.concat([path_df,headlands_path_connected])
+            total_path_no_dupl = total_path.drop_duplicates(['x','y'] ,ignore_index = True)
+            paths.append(total_path_no_dupl)
+            
 
-        total_path = pd.concat([path_df,headlands_path_connected])
-        total_path_no_dupl = total_path.drop_duplicates(['x','y'] ,ignore_index = True)
-        paths.append(total_path_no_dupl)
-        
+            seed_count,sp= plantseeds(total_path_no_dupl,tractor_width,seed_distance)
+            
+            sp_list.append(sp)
+            grid_hor,grid_ver,seed_count = create_grid(sp,seed_count,seed_distance,tractor_width)
+            # grid_hor_prepped = shapely.prepared.prep(grid_hor)
+            # grid_ver_prepped = shapely.prepared.prep(grid_ver)
+            score,sp_df =  check_alignment(sp,grid_hor,grid_ver,seed_count,margin = 0.01,full_score = False)
+            sp_df_list.append(sp_df)
+            print('Path {}, score: {}'.format(i,score))
+            score_list.append(score)
+            commands.append(commands_subfields)
 
-        seed_count,sp= plantseeds(total_path_no_dupl,tractor_width,seed_distance)
-        
-        sp_list.append(sp)
-        grid_hor,grid_ver,seed_count = create_grid(sp,seed_count,seed_distance,tractor_width)
-        grid_hor_prepped = shapely.prepared.prep(grid_hor)
-        grid_ver_prepped = shapely.prepared.prep(grid_ver)
-        score =  check_alignment(sp,grid_hor_prepped,grid_ver_prepped,seed_count,margin = 0.01,full_score = True)
-        print('Path {}, score: {}'.format(i,score))
-        score_list.append(score)
-        commands.append(commands_subfields)
+            # # Calculate path lenght as a measure of how good a path is, this should be replaced with a different measure
+            # total_len = 0
+            # for i in range(len(paths)):
+            #     total_len+= paths[i].length.item()
+            # path_lengths.append(total_len)
 
-        # # Calculate path lenght as a measure of how good a path is, this should be replaced with a different measure
-        # total_len = 0
-        # for i in range(len(paths)):
-        #     total_len+= paths[i].length.item()
-        # path_lengths.append(total_len)
-
-        # except Exception as error: # Error handling to make sure the loop continues if an error pops up
-        #     paths.append(None)
-        #     commands.append(None)
-        ##     path_lengths.append(0)
-        #     sp_list.append(None)
-        #     bases.append(None)
-        #     score_list.append(0)
-        #     print(error)
+        except Exception as error: # Error handling to make sure the loop continues if an error pops up
+            paths.append(None)
+            commands.append(None)
+        #     path_lengths.append(0)
+            sp_list.append(None)
+            bases.append(None)
+            score_list.append(0)
+            print(error)
             
     # Finding the path with the best measure
     seeds_no = [len(gpd.GeoSeries(sp).get_coordinates()) for sp in sp_list] # total number of seeds for different paths
     best_path_index = np.argmax(np.array(score_list)) # for now the measure is total seed count
+    best_score = score_list[best_path_index]
     best_path = paths[best_path_index]
     command = commands[best_path_index]
     # Converting path to df
     # best_path = path_to_df(best_path,command)
     sp = sp_list[best_path_index]
+    sp_df = sp_df_list[best_path_index]
+    sp_df['euclidian_dist'] = (sp_df['hor_distance']**2+sp_df['ver_distance']**2)**0.5
     base = bases[best_path_index]
     
     # Plot the path if it is specified
     if plotting:
         fig, ax = plt.subplots()
-        field.plot(ax = ax,color = 'g')
+        plt.rcParams["font.family"] = "serif"
+        plt.rcParams["font.serif"] = ["Times New Roman"]
+        field.plot(ax = ax,color = 'g',)
         field_headlands.boundary.plot(ax = ax,color = 'r')
         best_path.plot(x = 'x', y = 'y',ax = ax,color = 'magenta',marker = 'o',markersize = 1)
+        ax.set_title('Final path')
+        ax.get_legend().remove()
+        plt.savefig('final_path.pdf')
         plt.show()
-    
-    return field,field_headlands,best_path,sp, swaths_clipped,base, total_path, bases
-import time
 
+        fig , ax2 = plt.subplots(1,3,figsize = (15,5))
+        viridis = matplotlib.colormaps['viridis']
+
+        im1  = ax2[0].scatter(sp_df.x,sp_df.y, marker = 'o', c = sp_df['hor_distance'],s = 0.1,cmap = viridis)
+        field.boundary.plot(ax = ax2[0],color = 'k')
+        best_path.plot(x ='x',y='y',ax = ax2[0],color = 'm', alpha = 0.2)
+        ax2[0].set_title('Distance in driving direction')
+
+        im2 = ax2[1].scatter(sp_df.x,sp_df.y, marker = 'o', c = sp_df['ver_distance'],s = 0.1,cmap = viridis)
+        best_path.plot(x ='x',y='y',ax = ax2[1],color = 'm', alpha = 0.2)
+        field.boundary.plot(ax = ax2[1],color = 'k')
+        ax2[1].set_title('Distance normal to driving direction')
+
+        im3 = ax2[2].scatter(sp_df.x,sp_df.y, marker = 'o', c = sp_df['euclidian_dist'],s = 0.1,cmap = viridis)
+        best_path.plot(x ='x',y='y',ax = ax2[2],color = 'm', alpha = 0.2)
+        field.boundary.plot(ax = ax2[2],color = 'k')
+        ax2[2].set_title('Euclidean distance')
+
+        fig.subplots_adjust(right=0.8)
+        cbar_ax = fig.add_axes([0.85, 0.30, 0.01, 0.4])
+        cbar = fig.colorbar(im1, cax=cbar_ax)
+        cbar.set_label('Distance [m]')
+        fig.suptitle('Seed positions for final path, total score: {}'.format(best_score))
+
+        ax2[0].get_legend().remove()
+        ax2[1].get_legend().remove()
+        ax2[2].get_legend().remove()
+        # plt.scatter(sp_df.x,sp_df.y, marker = 'o', c = sp_df['hor_distance'],s = 0.1)
+        # fig.colorbar(im1,orientation = 'horizontal')
+
+        # plt.colorbar(sp_df['ver_distance'],ax =ax2[1])
+        # plt.colorbar(sp_df['euclidian_dist'],ax = ax2[2])
+        plt.show()
+
+    
+    return field,field_headlands,best_path,sp, swaths_clipped,base, total_path, bases,sp_df
+import time
+import matplotlib
 
 start = time.time()
-data_path ="./data/field_geometry/test_5.json"
-include_obs = True
+data_path ="./data/field_geometry/Eric_field_geojson.json"
+include_obs = False
 
 turning_rad = 4
-tractor_width = 6
-seed_distance = 0.5
+tractor_width = 3
+seed_distance = 2
 
 
-field, field_headlands, best_path,sp,swaths_clipped,base, total_path, bases = pathplanning(data_path,include_obs,turning_rad,tractor_width,False,seed_distance,False)
+
+field, field_headlands, best_path,sp,swaths_clipped,base, total_path, bases,sp_df = pathplanning(data_path,include_obs,turning_rad,tractor_width,True,seed_distance,False)
 
 end = time.time()
 
 print('total time elapsed: {:6f}'.format(end-start))
 
 
-plt.close('all')
 import matplotlib.animation as animation
 
 fig, ax = plt.subplots()
@@ -960,12 +1010,6 @@ field.plot(ax = ax,color = 'g')
 xdata, y = [], []
 
 graph1, = ax.plot([], [], 'mo-')
-
-# set up the plot
-# plt.xlim(250, 600)
-# plt.xlabel('X')
-# plt.ylim(0, 600)
-# plt.ylabel('Y')
 
 # animation function
 def animate(i):
