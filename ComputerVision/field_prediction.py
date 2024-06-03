@@ -65,6 +65,7 @@ def predict_json(image,scale,approx):
     ret, bin_img = cv2.threshold(
         gray_img, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
     )
+    cv2.imwrite("filter/predict_json_grey.png",bin_img)
     # Find contours in the binary image
     cnt, hit = cv2.findContours(bin_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_TC89_KCOS)
 
