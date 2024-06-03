@@ -7,13 +7,13 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 import math
-from dubins_curves import *
+from .dubins_curves import *
 import shapely.affinity
 from shapely import Point
 from shapely.ops import split, nearest_points
 
 
-def load_data(filepath,include_obstacles = False):
+def load_data(filepath,include_obstacles = False,scale_pixels:int=1):
     """
     Loads json file and create polygon object for the field.
 
@@ -32,7 +32,7 @@ def load_data(filepath,include_obstacles = False):
     polygons = []
     for i in range(len(json_data['features'])):
         coordinates.append(json_data['features'][i]['geometry']['coordinates'])
-        polygons.append(gpd.GeoSeries(Polygon(coordinates[i][0])))
+        polygons.append(gpd.GeoSeries(Polygon(coordinates[i][0])).scale(scale_pixels,scale_pixels))
     
     field = polygons[0]
     obstacles = []
@@ -311,7 +311,7 @@ def generate_path(swaths_clipped_nonempty, turning_rad):
     # append the last AB-line to the path 
     path.append(gpd.GeoSeries(line2[0]))
 
-    return path
+    return line
 
 def interpolate_path(path,distance,base,no_offset):
     """
@@ -822,6 +822,7 @@ def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting,seed_d
         field, obstacles = load_data(data_path,include_obs) 
     else:
         field = load_data(data_path,include_obs) 
+
     field_headlands, headland_size = generate_headlands(field,turning_rad,tractor_width)
     coordinates = field.get_coordinates()
     coordinates_headlands = field_headlands.get_coordinates()
@@ -921,9 +922,12 @@ def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting,seed_d
             print(error)
             
     # Finding the path with the best measure
+
     seeds_no = [len(gpd.GeoSeries(sp).get_coordinates()) for sp in sp_list] # total number of seeds for different paths
+
     best_path_index = np.argmax(np.array(score_list)) # for now the measure is total seed count
     best_score = score_list[best_path_index]
+
     best_path = paths[best_path_index]
     command = commands[best_path_index]
     # Converting path to df
@@ -945,6 +949,7 @@ def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting,seed_d
         ax.get_legend().remove()
         plt.savefig('final_path.pdf')
         plt.show()
+
 
         fig , ax2 = plt.subplots(1,3,figsize = (15,5))
         viridis = matplotlib.colormaps['viridis']
