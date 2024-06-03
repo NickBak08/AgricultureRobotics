@@ -35,5 +35,5 @@ EXPOSE 8501
 HEALTHCHECK CMD curl --fail http://localhost:8501/_stcore/health
 
 # Can have 1 entrypoint in docker file this command will be run when docker run is used
-ENTRYPOINT ["/app/clone_and_run.sh"]
+ENTRYPOINT ["sh","./clone_and_run.sh"]
 
