@@ -1,6 +1,6 @@
 import json
 import matplotlib.pyplot as plt
-
+import matplotlib
 from shapely.geometry import Polygon
 from shapely.geometry import LineString,MultiLineString
 import geopandas as gpd
@@ -20,6 +20,7 @@ def load_data(filepath,include_obstacles = False,scale_pixels:int=1):
     Parameters:
         filepath (str): filepath that contains the json file to be parsed
         include_obstacles (bool): boolean to indicate if you want to include the obstacles in the resulting field (will probably be usefull for some debugging)
+        scale_pixels (int): to scale the field to the real size
 
     Returns:
         field (geopandas GeoSeries): GeoSeries of the polygon - the shape of the field (with obstacles if include_obstacles = True)
@@ -311,7 +312,7 @@ def generate_path(swaths_clipped_nonempty, turning_rad):
     # append the last AB-line to the path 
     path.append(gpd.GeoSeries(line2[0]))
 
-    return line
+    return path
 
 def interpolate_path(path,distance,base,no_offset):
     """
@@ -333,21 +334,21 @@ def interpolate_path(path,distance,base,no_offset):
     for i in range(len(path)): # Loop over the list of path segments
         if i%2 == 0: # We always start the path with a straight line, and then turns and straight lines alternate, so each even entry in the list is a straight line segment
             line = path[i][0]
-        # if i%4 ==0: # Every second straight line segment has to be reversed; each vector has the same direction, but the tractor
-                    #should drive back and forth, so each 4th element in the row (every second straight path) reversed and then interpolated
-            begin = Point(line.coords[0]) # beginning of the straight line on tractor's path
-            distance_from_base  = begin.distance(base) # distance from the reference line
-            offset = distance - distance_from_base%distance # how much the seeding needs to be offset to make the seeds aligned
-            if no_offset:
-                offset = 0
-            distances = np.arange(offset,line.length,distance) # distances between the placed seeds and the beginning of the seed grid
-            # else:
-                # begin = Point(line.coords[1]) # beginning of the straight line on tractor's path - the other direction than the previous one
-                # distance_from_base  = begin.distance(base)
-                # offset = distance_from_base%distance # the other way than the previous line
-                # if no_offset:
-                #     offset = 0
-                # distances = np.arange(line.length-offset,0,-distance) # the other way than the previous line
+            if i%4 ==0: # Every second straight line segment has to be reversed; each vector has the same direction, but the tractor
+                        #should drive back and forth, so each 4th element in the row (every second straight path) reversed and then interpolated
+                begin = Point(line.coords[0]) # beginning of the straight line on tractor's path
+                distance_from_base  = begin.distance(base) # distance from the reference line
+                offset = distance - distance_from_base%distance # how much the seeding needs to be offset to make the seeds aligned
+                if no_offset:
+                    offset = 0
+                distances = np.arange(offset,line.length,distance) # distances between the placed seeds and the beginning of the seed grid
+            else:
+                begin = Point(line.coords[0]) # beginning of the straight line on tractor's path - the other direction than the previous one
+                distance_from_base  = begin.distance(base)
+                offset = distance_from_base%distance # the other way than the previous line
+                if no_offset:
+                    offset = 0
+                distances = np.arange(offset,line.length,distance) # the other way than the previous line
 
             try: # if the line is long enough to interpolate
                 interpolated_path = LineString([line.interpolate(distance) for distance in distances])
@@ -661,22 +662,6 @@ def check_alignment(sp,grid_hor,grid_ver,seed_count,margin = 0.01,full_score = F
     sp_df['on_grid_hor'] = ver_aligned
     sp_df['on_grid'] = results
     
-    # Plotting:
-    # _, ax = plt.subplots(1,3,figsize = (15,5))
-    # for (v,c) in [(True,'b'),(False,'r')]: # Colors based on whether a seed is on the grid or not
-    #     ax[0].plot(sp_df.x[sp_df.on_grid_hor == v],sp_df.y[sp_df.on_grid_hor == v],'o',markersize = 1)
-    # for (v,c) in [(True,'b'),(False,'r')]:
-    #     ax[1].plot(sp_df.x[sp_df.on_grid_ver == v],sp_df.y[sp_df.on_grid_ver == v],'o',markersize = 1)
-    # for (v,c) in [(True,'b'),(False,'r')]:
-    #     ax[2].plot(sp_df.x[sp_df.on_grid == v],sp_df.y[sp_df.on_grid == v],'o',markersize = 1)
-
-    # ax[0].legend(['Aligned', 'Misaligned'])
-    # ax[1].legend(['Aligned', 'Misaligned'])
-    # ax[2].legend(['Aligned', 'Misaligned'])
-    # ax[0].set_title('horizontal alignment')
-    # ax[1].set_title('vertical alignment')
-    # ax[2].set_title('Total alignment')
-      
 
     score = sum(results)/len(hor_aligned)
 
@@ -800,7 +785,7 @@ def boustrophedon_decomposition(field,obstacles,base_ab,slope):
  
     return decomposed_polygons
 
-def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting,seed_distance,no_offset = False):
+def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting,seed_distance,no_offset = False,scale:int=1):
     """
     main function for the pathplanning, loads the data and generates a path (maybe its better to make this a class but idk)
     
@@ -820,9 +805,14 @@ def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting,seed_d
     """
     if include_obs:
         field, obstacles = load_data(data_path,include_obs) 
+        fig, ax = plt.subplots()
+        field.plot(ax=ax, color='lightblue', edgecolor='black')
+        plt.savefig("filter/path_plot.png")
     else:
         field = load_data(data_path,include_obs) 
-
+        fig, ax = plt.subplots()
+        field.plot(ax=ax, color='lightblue', edgecolor='black')
+        plt.savefig("filter/path_plot.png")
     field_headlands, headland_size = generate_headlands(field,turning_rad,tractor_width)
     coordinates = field.get_coordinates()
     coordinates_headlands = field_headlands.get_coordinates()
@@ -900,38 +890,30 @@ def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting,seed_d
             grid_hor,grid_ver,seed_count = create_grid(sp,seed_count,seed_distance,tractor_width)
             # grid_hor_prepped = shapely.prepared.prep(grid_hor)
             # grid_ver_prepped = shapely.prepared.prep(grid_ver)
-            score,sp_df =  check_alignment(sp,grid_hor,grid_ver,seed_count,margin = 0.01,full_score = False)
+            score,sp_df =  check_alignment(sp,grid_hor,grid_ver,seed_count,margin = 0.01,full_score = True)
             sp_df_list.append(sp_df)
             print('Path {}, score: {}'.format(i,score))
             score_list.append(score)
             commands.append(commands_subfields)
 
-            # # Calculate path lenght as a measure of how good a path is, this should be replaced with a different measure
-            # total_len = 0
-            # for i in range(len(paths)):
-            #     total_len+= paths[i].length.item()
-            # path_lengths.append(total_len)
 
         except Exception as error: # Error handling to make sure the loop continues if an error pops up
             paths.append(None)
             commands.append(None)
         #     path_lengths.append(0)
             sp_list.append(None)
+            sp_df_list.append(None)
             bases.append(None)
             score_list.append(0)
             print(error)
             
     # Finding the path with the best measure
-
     seeds_no = [len(gpd.GeoSeries(sp).get_coordinates()) for sp in sp_list] # total number of seeds for different paths
-
     best_path_index = np.argmax(np.array(score_list)) # for now the measure is total seed count
     best_score = score_list[best_path_index]
-
     best_path = paths[best_path_index]
     command = commands[best_path_index]
-    # Converting path to df
-    # best_path = path_to_df(best_path,command)
+
     sp = sp_list[best_path_index]
     sp_df = sp_df_list[best_path_index]
     sp_df['euclidian_dist'] = (sp_df['hor_distance']**2+sp_df['ver_distance']**2)**0.5
@@ -939,6 +921,7 @@ def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting,seed_d
     
     # Plot the path if it is specified
     if plotting:
+        # Plotting the final (best) path
         fig, ax = plt.subplots()
         plt.rcParams["font.family"] = "serif"
         plt.rcParams["font.serif"] = ["Times New Roman"]
@@ -947,11 +930,14 @@ def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting,seed_d
         best_path.plot(x = 'x', y = 'y',ax = ax,color = 'magenta',marker = 'o',markersize = 1)
         ax.set_title('Final path')
         ax.get_legend().remove()
-        plt.savefig('final_path.pdf')
-        plt.show()
+        plt.savefig('filter/final_path.png')
 
 
+
+        # Plotting seed offsets for different directions 
         fig , ax2 = plt.subplots(1,3,figsize = (15,5))
+        plt.rcParams["font.family"] = "serif"
+        plt.rcParams["font.serif"] = ["Times New Roman"]
         viridis = matplotlib.colormaps['viridis']
 
         im1  = ax2[0].scatter(sp_df.x,sp_df.y, marker = 'o', c = sp_df['hor_distance'],s = 0.1,cmap = viridis)
@@ -978,54 +964,26 @@ def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting,seed_d
         ax2[0].get_legend().remove()
         ax2[1].get_legend().remove()
         ax2[2].get_legend().remove()
-        # plt.scatter(sp_df.x,sp_df.y, marker = 'o', c = sp_df['hor_distance'],s = 0.1)
-        # fig.colorbar(im1,orientation = 'horizontal')
+        plt.savefig('filter/Seedoffsets.png')
 
-        # plt.colorbar(sp_df['ver_distance'],ax =ax2[1])
-        # plt.colorbar(sp_df['euclidian_dist'],ax = ax2[2])
-        plt.show()
+        # Plotting seed alignment:
+        _, ax = plt.subplots(1,3,figsize = (15,5))
+        plt.rcParams["font.family"] = "serif"
+        plt.rcParams["font.serif"] = ["Times New Roman"]        
+        for (v,c) in [(True,'b'),(False,'r')]: # Colors based on whether a seed is on the grid or not
+            ax[0].plot(sp_df.x[sp_df.on_grid_hor == v],sp_df.y[sp_df.on_grid_hor == v],'o',markersize = 1)
+        for (v,c) in [(True,'b'),(False,'r')]:
+            ax[1].plot(sp_df.x[sp_df.on_grid_ver == v],sp_df.y[sp_df.on_grid_ver == v],'o',markersize = 1)
+        for (v,c) in [(True,'b'),(False,'r')]:
+            ax[2].plot(sp_df.x[sp_df.on_grid == v],sp_df.y[sp_df.on_grid == v],'o',markersize = 1)
+
+        ax[0].legend(['Aligned', 'Misaligned'])
+        ax[1].legend(['Aligned', 'Misaligned'])
+        ax[2].legend(['Aligned', 'Misaligned'])
+        ax[0].set_title('horizontal alignment')
+        ax[1].set_title('vertical alignment')
+        ax[2].set_title('Total alignment')
+        plt.savefig('filter/Seedalignment.png')
 
     
     return field,field_headlands,best_path,sp, swaths_clipped,base, total_path, bases,sp_df
-import time
-import matplotlib
-
-start = time.time()
-data_path ="./data/field_geometry/Eric_field_geojson.json"
-include_obs = False
-
-turning_rad = 4
-tractor_width = 3
-seed_distance = 2
-
-
-
-field, field_headlands, best_path,sp,swaths_clipped,base, total_path, bases,sp_df = pathplanning(data_path,include_obs,turning_rad,tractor_width,True,seed_distance,False)
-
-end = time.time()
-
-print('total time elapsed: {:6f}'.format(end-start))
-
-
-import matplotlib.animation as animation
-
-fig, ax = plt.subplots()
-field.plot(ax = ax,color = 'g')
-
-xdata, y = [], []
-
-graph1, = ax.plot([], [], 'mo-')
-
-# animation function
-def animate(i):
-    xdata.append(total_path.iloc[5*i]['x'])
-    y.append(total_path.iloc[5*i]['y'])
-    graph1.set_data(xdata, y)
-
-    return (graph1,)
-length = len(total_path)//5
-anim = animation.FuncAnimation(fig, animate,  frames=length, interval=10, blit=True)
-# To save the animation using Pillow as a gif
-writer = animation.PillowWriter(fps=60)
-anim.save('scatter.gif', writer=writer)
-plt.show()

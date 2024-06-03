@@ -3,10 +3,12 @@ from ComputerVision.field_prediction import predict_field, predict_json, filter_
 from PathPlanning.pathplanning import pathplanning,load_data
 from Simulation.MPC_pathtracking import track_path
 from Simulation.PID_pathtracking import path_tracking
+from Simulation.LQR_pathtracking import track_path as track_path_lqr
 from PIL import Image
 import matplotlib.pyplot as plt
 import cv2
 import numpy as np
+import base64
 import math
 
 # These are session states you can see it as global variables. 
@@ -169,7 +171,29 @@ def plan_path():
     '''Callback function for path planning button'''
     data_path ="./filter/filtered_geojson.json"
     include_obs = False
-    field,field_headlands,best_path,sp, swaths_clipped,base, total_path, bases = pathplanning(data_path=data_path,include_obs=include_obs,turning_rad=turning_radius,tractor_width=tractor_width,seed_distance=seed_distance,plotting=True,interpolation_dist=0.5)
+    field,field_headlands,best_path,sp, swaths_clipped,base, total_path, bases,sp_df = pathplanning(data_path=data_path,include_obs=include_obs,turning_rad=turning_radius,tractor_width=tractor_width,seed_distance=seed_distance,plotting=True)
+    import matplotlib.animation as animation
+
+    fig, ax = plt.subplots()
+    field.plot(ax = ax,color = 'g')
+
+    xdata, y = [], []
+
+    graph1, = ax.plot([], [], 'mo-')
+
+    # animation function
+    def animate(i):
+        xdata.append(total_path.iloc[5*i]['x'])
+        y.append(total_path.iloc[5*i]['y'])
+        graph1.set_data(xdata, y)
+
+        return (graph1,)
+    length = len(total_path)//5
+    anim = animation.FuncAnimation(fig, animate,  frames=length, interval=10, blit=True)
+    # To save the animation using Pillow as a gif
+    writer = animation.PillowWriter(fps=60)
+    anim.save('filter/scatter.gif', writer=writer)
+
     st.session_state['simulate_path'] = best_path
     st.session_state.clicked_path = True
     
@@ -178,13 +202,22 @@ st.button("Plan path",on_click=plan_path)
 # show the planned path
 if st.session_state.clicked_path:
     st.title("Path planning result")
-    st.image("./filter/path_field.png")
+    st.image("./filter/final_path.png")
+    file_ = open("./filter/scatter.gif", "rb")
+    contents = file_.read()
+    data_url = base64.b64encode(contents).decode("utf-8")
+    file_.close()
+    st.markdown(
+    f'<img src="data:image/gif;base64,{data_url}" alt="field gif">',
+    unsafe_allow_html=True,)
+    st.image("./filter/Seedalignment.png",use_column_width="always")
+    st.image("./filter/Seedoffsets.png",use_column_width="always")
 
 # Title for the simulation part with parameters
 st.title("Simulation_result")
 velocity_model = st.number_input("Velocity",value=1.0)
 iteration_number = st.number_input("Iteration limit",value=500)
-option = st.selectbox("Which controller to use for simulation?",("PID","MPC"))
+option = st.selectbox("Which controller to use for simulation?",("LQR","PID","MPC"))
 
 def simulate_path():
     '''Callback function for simulating path button'''
@@ -192,6 +225,8 @@ def simulate_path():
         path_tracking(st.session_state['simulate_path'],velocity_model,iteration_number)
     elif option == "MPC":
         track_path(st.session_state['simulate_path'],velocity_model,iteration_number)
+    elif option == "LQR":
+        track_path_lqr(st.session_state['simulate_path'],0,velocity_model,iteration_number,save_animation=True,save_picture=True)
     st.session_state.clicked_simulation = True
 
 st.button("Simulate path test",on_click=simulate_path)
@@ -202,5 +237,15 @@ if st.session_state.clicked_simulation:
         st.image("./filter/simulation_field.png")
     elif option == "MPC":
         st.image("./filter/simulation_field_mpc.png")
+    elif option == "LQR":
+        st.image("./filter/Path_Tracking_Result.svg")
+        file_ = open("./filter/path_tracking_animation.gif", "rb")
+        contents = file_.read()
+        data_url_sim = base64.b64encode(contents).decode("utf-8")
+        file_.close()
+        st.markdown(
+        f'<center><img src="data:image/gif;base64,{data_url_sim}" alt="field gif"></center>',
+        unsafe_allow_html=True,)
+        st.image("./filter/Velocity_Profile_Over_Time.png")
     else:
         st.write("Wrong simulation chosen or error")

@@ -7,7 +7,7 @@ from matplotlib.animation import FuncAnimation
 from scipy.spatial import KDTree
 from matplotlib.colors import Normalize
 
-MAX_STEER = np.deg2rad(120.0)  # maximum steering angle [rad]
+MAX_STEER = np.deg2rad(70.0)  # maximum steering angle [rad]
 MAX_ACC = 0.5
 MAX_VEL = 2
 N=100 
@@ -392,7 +392,7 @@ def track_path(refer_df, initial_speed, target_speed, iteration_limit, noise = N
     if (save_animation == True):
         fig = plt.figure(figsize=(8, 8))
         animation = FuncAnimation(fig, update_plot, frames=len(x_), interval=100)
-        animation.save('path_tracking_animation.gif', writer='pillow') 
+        animation.save('./filter/path_tracking_animation.gif', writer='pillow') 
 
     # Calculate the accuracy
     measurement_accuracy = 0    
@@ -414,7 +414,7 @@ def track_path(refer_df, initial_speed, target_speed, iteration_limit, noise = N
     plt.grid(True)
     plt.show()
     if save_picture == True:
-        plt.savefig('Path Tracking Result.svg', format='svg',bbox_inches='tight')
+        plt.savefig('./filter/Path_Tracking_Result.svg', format='svg',bbox_inches='tight')
 
     plt.figure(figsize=(8, 4))
     plt.plot(velocities, '-b', label='Velocity')
@@ -424,7 +424,7 @@ def track_path(refer_df, initial_speed, target_speed, iteration_limit, noise = N
     plt.legend()
     plt.grid(True)
     if save_picture == True:
-        plt.savefig('Velocity Profile Over Time.png',bbox_inches='tight')
+        plt.savefig('./filter/Velocity_Profile_Over_Time.png',bbox_inches='tight')
     plt.show()
 
     return x_, y_ , plant_points_x, plant_points_y, plant_points_yaw, commands,measurement_accuracy,index
@@ -484,7 +484,7 @@ def calculate_seeding_positions(x_points, y_points, commands,final_index, spread
     plt.show()
     return seed_positions_array,right_positions_array
 
-data_path ='D:/5ARIP10 Team Project/working space/AgricultureRobotics/Simulation/bestpath-1.csv'
+# data_path ='D:/5ARIP10 Team Project/working space/AgricultureRobotics/Simulation/bestpath-1.csv'
 
 
 # NOTICE
@@ -492,19 +492,19 @@ data_path ='D:/5ARIP10 Team Project/working space/AgricultureRobotics/Simulation
 # Lower target speed can result in better performance, but it takes lots of time.
 # May you can run the whole simulation before and upload the result picture in GUI for the simulation result
 
-refer_path = pd.read_csv(data_path) # Change to the path plan result
-x_points = np.array(refer_path['x'])
-y_points = np.array(refer_path['y'])
-initial_speed = 1
-target_speed = 1.5
-iteration_limit = 1000
-noise = None
-save_picture = None
-save_animation = None #save the animation would take a long time to complete, dont recommand to use it in low target speed(less than 10),its hard to see tractor moving
+# refer_path = pd.read_csv(data_path) # Change to the path plan result
+# x_points = np.array(refer_path['x'])
+# y_points = np.array(refer_path['y'])
+# initial_speed = 1
+# target_speed = 1.5
+# iteration_limit = 1000
+# noise = None
+# save_picture = None
+# save_animation = None #save the animation would take a long time to complete, dont recommand to use it in low target speed(less than 10),its hard to see tractor moving
 
-# Use this function to see the path tracking result
-x_,y_,plant_points_x,plant_points_y,plant_points_yaw, command, accuracy, final_ind = track_path(refer_path, initial_speed, target_speed, iteration_limit,noise,save_picture,save_animation)
+# # Use this function to see the path tracking result
+# x_,y_,plant_points_x,plant_points_y,plant_points_yaw, command, accuracy, final_ind = track_path(refer_path, initial_speed, target_speed, iteration_limit,noise,save_picture,save_animation)
 
-# Use this function to see the planting result
-spread_distance = 2 # distance between tractor and seed
-seed_positions_array,correct_positions_array = calculate_seeding_positions(x_points, y_points, command,final_ind,spread_distance,save_picture)
+# # Use this function to see the planting result
+# spread_distance = 2 # distance between tractor and seed
+# seed_positions_array,correct_positions_array = calculate_seeding_positions(x_points, y_points, command,final_ind,spread_distance,save_picture)
