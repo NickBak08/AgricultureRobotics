@@ -923,8 +923,8 @@ def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting,seed_d
     if plotting:
         # Plotting the final (best) path
         fig, ax = plt.subplots()
-        plt.rcParams["font.family"] = "serif"
-        plt.rcParams["font.serif"] = ["Times New Roman"]
+#        plt.rcParams["font.family"] = "serif"
+#        plt.rcParams["font.serif"] = ["Times New Roman"]
         field.plot(ax = ax,color = 'g',)
         field_headlands.boundary.plot(ax = ax,color = 'r')
         best_path.plot(x = 'x', y = 'y',ax = ax,color = 'magenta',marker = 'o',markersize = 1)
@@ -936,8 +936,8 @@ def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting,seed_d
 
         # Plotting seed offsets for different directions 
         fig , ax2 = plt.subplots(1,3,figsize = (15,5))
-        plt.rcParams["font.family"] = "serif"
-        plt.rcParams["font.serif"] = ["Times New Roman"]
+#        plt.rcParams["font.family"] = "serif"
+#        plt.rcParams["font.serif"] = ["Times New Roman"]
         viridis = matplotlib.colormaps['viridis']
 
         im1  = ax2[0].scatter(sp_df.x,sp_df.y, marker = 'o', c = sp_df['hor_distance'],s = 0.1,cmap = viridis)
@@ -968,8 +968,8 @@ def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting,seed_d
 
         # Plotting seed alignment:
         _, ax = plt.subplots(1,3,figsize = (15,5))
-        plt.rcParams["font.family"] = "serif"
-        plt.rcParams["font.serif"] = ["Times New Roman"]        
+#        plt.rcParams["font.family"] = "serif"
+#        plt.rcParams["font.serif"] = ["Times New Roman"]        
         for (v,c) in [(True,'b'),(False,'r')]: # Colors based on whether a seed is on the grid or not
             ax[0].plot(sp_df.x[sp_df.on_grid_hor == v],sp_df.y[sp_df.on_grid_hor == v],'o',markersize = 1)
         for (v,c) in [(True,'b'),(False,'r')]:

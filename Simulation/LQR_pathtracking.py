@@ -18,8 +18,8 @@ dt=0.5
 L= 2 
 Kp = 1.0
 # Change the font in all plots
-plt.rcParams["font.family"] = "serif"
-plt.rcParams["font.serif"] = ["Times New Roman"]
+# plt.rcParams["font.family"] = "serif"
+# plt.rcParams["font.serif"] = ["Times New Roman"]
 
 class KinematicModel:
     """

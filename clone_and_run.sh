@@ -15,6 +15,6 @@ git clone https://$GITHUB_TOKEN:x-oauth-basic@github.com/NickBak08/AgricultureRo
 echo $(pwd)
 echo $(ls)
 echo $(ls AgricultureRobotics)
-cd ./AgricultureRobotics
+
 # Run program and redirect to the good port
-#streamlit run HomePage.py --server.port=8501 --server.address=0.0.0.0
+streamlit run /app/AgricultureRobotics/HomePage.py --server.port=8501 --server.address=0.0.0.0
