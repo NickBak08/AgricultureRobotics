@@ -448,7 +448,7 @@ def track_path(refer_df, initial_speed, target_speed, iteration_limit, noise = N
     if (save_animation == True):
         fig = plt.figure(figsize=(8, 8))
         animation = FuncAnimation(fig, update_plot, frames=len(x_), interval=100)
-        animation.save('path_tracking_animation.gif', writer='pillow')
+        animation.save('./filter/path_tracking_animation.gif', writer='pillow')
 
     plt.figure(figsize=(8, 8))
     plt.plot(refer_df['x'], refer_df['y'], '-.b', linewidth=1.0, label='Reference Path')
@@ -461,7 +461,7 @@ def track_path(refer_df, initial_speed, target_speed, iteration_limit, noise = N
     plt.grid(True)
     plt.show()
     if save_picture == True:
-        plt.savefig('./filter/Path_Tracking_Result.svg', format='svg',bbox_inches='tight')
+        plt.savefig('./filter/Path_Tracking_Result.png', format='png',bbox_inches='tight')
 
     plt.figure(figsize=(8, 8))
     plt.plot(lateral_error,'-b')
@@ -469,8 +469,8 @@ def track_path(refer_df, initial_speed, target_speed, iteration_limit, noise = N
     plt.ylabel('Lateral Error')
     plt.title('Lateral Error Over Time')
     if save_picture == True:
-        plt.savefig('Lateral Error Over Time.svg', format='svg',bbox_inches='tight')
-        plt.savefig('./filter/Velocity_Profile_Over_Time.png',bbox_inches='tight')
+        plt.savefig('./filter/Lateral Error Over Time.png', format='png',bbox_inches='tight')
+        #plt.savefig('./filter/Velocity_Profile_Over_Time.png',bbox_inches='tight')
 
 
     plt.figure(figsize=(8, 8))
@@ -479,7 +479,7 @@ def track_path(refer_df, initial_speed, target_speed, iteration_limit, noise = N
     plt.ylabel('Longitudinal Error')
     plt.title('Longitudinal Error Over Time')
     if save_picture == True:
-        plt.savefig('Longitudinal Error Over Time.svg', format='svg',bbox_inches='tight')
+        plt.savefig('./filter/Longitudinal Error Over Time.png', format='png',bbox_inches='tight')
 
     plt.figure(figsize=(8, 4))
     plt.plot(travel_distance,velocities, '-b', label='Velocity')
@@ -489,7 +489,7 @@ def track_path(refer_df, initial_speed, target_speed, iteration_limit, noise = N
     plt.legend()
     plt.grid(True)
     if save_picture == True:
-        plt.savefig('Velocity Profile Over Time.svg',bbox_inches='tight')
+        plt.savefig('./filter/Velocity Profile Over Time.png',bbox_inches='tight')
     plt.show()
 
     def calculate_seeding_positions(x_points, y_points, commands,final_index, spread_distance,save_picture = None):
@@ -543,7 +543,7 @@ def track_path(refer_df, initial_speed, target_speed, iteration_limit, noise = N
         plt.legend()
         plt.grid(True)
         if save_picture == True:
-            plt.savefig('Seeding Positions.png',bbox_inches='tight')
+            plt.savefig('./filter/Seeding Positions.png',bbox_inches='tight')
         plt.show()
         return seed_positions_array,right_positions_array
     spread_distance = 2 # distance between tractor and seed

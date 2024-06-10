@@ -7,7 +7,7 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 import math
-from dubins_curves import *
+from .dubins_curves import *
 import shapely.affinity
 from shapely import Point
 from shapely.ops import split, nearest_points
@@ -920,8 +920,8 @@ def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting,seed_d
     if plotting:
         # Plotting the final (best) path
         fig, ax = plt.subplots()
-        plt.rcParams["font.family"] = "serif"
-        plt.rcParams["font.serif"] = ["Times New Roman"]
+        #plt.rcParams["font.family"] = "serif"
+        #plt.rcParams["font.serif"] = ["Times New Roman"]
         field.boundary.plot(ax = ax,color = 'yellowgreen',label = 'field boundary')
         field_headlands.boundary.plot(ax = ax,color = 'r', label = 'headland boundary')
         best_path.plot(x = 'x', y = 'y',ax = ax,color = 'magenta',marker = 'o',markersize = 1, label = 'tractor path')
@@ -933,8 +933,8 @@ def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting,seed_d
 
         # Plotting seed offsets for different directions 
         fig , ax2 = plt.subplots(1,3,figsize = (15,3))
-        plt.rcParams["font.family"] = "serif"
-        plt.rcParams["font.serif"] = ["Times New Roman"]
+        #plt.rcParams["font.family"] = "serif"
+        #plt.rcParams["font.serif"] = ["Times New Roman"]
 
         viridis = matplotlib.colormaps['viridis']
 
@@ -972,8 +972,8 @@ def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting,seed_d
 
         # Plotting seed alignment:
         _, ax = plt.subplots(1,3,figsize = (15,5))
-        plt.rcParams["font.family"] = "serif"
-        plt.rcParams["font.serif"] = ["Times New Roman"]        
+        #plt.rcParams["font.family"] = "serif"
+        #plt.rcParams["font.serif"] = ["Times New Roman"]        
 
         for (v,c) in [(True,'b'),(False,'r')]: # Colors based on whether a seed is on the grid or not
             ax[0].plot(sp_df.x[sp_df.on_grid_hor == v],sp_df.y[sp_df.on_grid_hor == v],'o',markersize = 1)
@@ -994,49 +994,49 @@ def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting,seed_d
         ax[0].set_title('Alignment in driving direction')
         ax[1].set_title('Alignment normal to driving direction')
         ax[2].set_title('Total alignment')
-        plt.savefig('Seedalignment.pdf')
+        plt.savefig('filter/Seedalignment.png')
 
     return field,field_headlands,best_path,sp, swaths_clipped,base, total_path, bases,sp_df
 
 
-# Example 
-import time
-import matplotlib
+# # Example 
+# import time
+# import matplotlib
 
-start = time.time()
-data_path ="./data/field_geometry/Eric_field_geojson.json"
-include_obs = False
+# start = time.time()
+# data_path ="./data/field_geometry/Eric_field_geojson.json"
+# include_obs = False
 
-turning_rad = 4
-tractor_width = 3
-seed_distance = 2
+# turning_rad = 4
+# tractor_width = 3
+# seed_distance = 2
 
-field, field_headlands, best_path,sp,swaths_clipped,base, total_path, bases,sp_df = pathplanning(data_path,include_obs,turning_rad,tractor_width,True,seed_distance,False)
+# field, field_headlands, best_path,sp,swaths_clipped,base, total_path, bases,sp_df = pathplanning(data_path,include_obs,turning_rad,tractor_width,True,seed_distance,False)
 
-end = time.time()
-print('total time elapsed: {:6f}'.format(end-start))
+# end = time.time()
+# print('total time elapsed: {:6f}'.format(end-start))
 
 
-# Make a gif with the path of the tractor and seed positions
-import matplotlib.animation as animation
+# # Make a gif with the path of the tractor and seed positions
+# import matplotlib.animation as animation
 
-fig, ax = plt.subplots()
-field.plot(ax = ax,color = 'g')
+# fig, ax = plt.subplots()
+# field.plot(ax = ax,color = 'g')
 
-xdata, y = [], []
+# xdata, y = [], []
 
-graph1, = ax.plot([], [], 'mo-')
+# graph1, = ax.plot([], [], 'mo-')
 
-# animation function
-def animate(i):
-    xdata.append(total_path.iloc[5*i]['x'])
-    y.append(total_path.iloc[5*i]['y'])
-    graph1.set_data(xdata, y)
-    return (graph1,)
+# # animation function
+# def animate(i):
+#     xdata.append(total_path.iloc[5*i]['x'])
+#     y.append(total_path.iloc[5*i]['y'])
+#     graph1.set_data(xdata, y)
+#     return (graph1,)
 
-length = len(total_path)//5
-anim = animation.FuncAnimation(fig, animate,  frames=length, interval=10, blit=True)
-# To save the animation using Pillow as a gif
-writer = animation.PillowWriter(fps=60)
-anim.save('scatter.gif', writer=writer)
-plt.show()
+# length = len(total_path)//5
+# anim = animation.FuncAnimation(fig, animate,  frames=length, interval=10, blit=True)
+# # To save the animation using Pillow as a gif
+# writer = animation.PillowWriter(fps=60)
+# anim.save('scatter.gif', writer=writer)
+# plt.show()

@@ -19,6 +19,9 @@ if 'area_field' not in st.session_state:
 if 'simulate_path' not in st.session_state:
     st.session_state['simulate_path'] = 'value'
 
+if 'final_accuracy' not in st.session_state:
+    st.session_state['final_accuracy'] = 'value'
+
 if 'clicked_predict' not in st.session_state:
     st.session_state.clicked_predict = False
 
@@ -50,7 +53,7 @@ def reset_gui():
 
 # Creating the title for uploading images
 st.title("Upload image field")
-
+st.markdown("Upload the image that needs to be analyzed to find fields and then press detect fields button. Image needs to be 640x640 pixels")
 # Set the confidence on which you want to filter
 confidence_model = st.number_input("Model confidence",0.0,1.0,step=0.01,value=0.6,on_change=None)
 
@@ -75,6 +78,7 @@ st.button("Detect fields",on_click=predict_button)
 
 # Title for setting the scaling factor
 st.title("Input size field")
+st.markdown("Put the 2 pixels in the right place and set the distance between these pixels in meters to scale the input image to its real size.")
 
 def choose_pixel_image_scale():
     '''Callback function for showing the pixels that are chosen'''
@@ -98,7 +102,7 @@ distance = st.number_input("Distance in meters",min_value=0.1,value=1.0,key="dis
 
 # Title for making a bridge
 st.title("Bridge creator")
-
+st.markdown("When needed create a bridge between two fields by setting the pixels on the right locations.")
 def choose_pixel_image_bridge():
     '''Callback function for showing the pixels that are chosen'''
     pil_image = Image.open(uploaded_file).convert('RGB')
@@ -122,7 +126,7 @@ if st.session_state.select_pixel_bridge:
 
 # Title for the second part of the GUI selecting which field you want to use. 
 st.title("Select Field")
-
+st.markdown("Select the field that needs to be used. It can be approximated to make the calculation of the path and simulation faster.")
 # When value is changed of the number inputs below run this function
 def select_field():
     '''Callback function for selecting which field to use'''
@@ -141,7 +145,7 @@ def select_field():
     data_path ="./filter/filtered_geojson.json"
 
     # Plot the field that is selected
-    field = load_data(data_path,scale_pixels=1)
+    field = load_data(data_path)
     st.session_state["area_field"] = str(field.area.to_numpy()[0])
     fig, ax = plt.subplots()
     field.plot(ax=ax, color='lightblue', edgecolor='black')
@@ -162,9 +166,10 @@ if st.session_state.show_field:
 
 # For inputing the parameters of the dynamics of the tractor
 st.title("Parameters path planning")
-turning_radius = st.number_input("Turning radius", value=1,min_value=1)
-tractor_width = st.number_input("Tractor width",value=1,min_value=1)
-seed_distance = st.number_input("Seed distance",value=1,min_value=1)
+st.markdown("Input the parameters of the vehicle and plan a path across the field.")
+turning_radius = st.number_input("Turning radius meters", value=1,min_value=1)
+tractor_width = st.number_input("Tractor width meters",value=1,min_value=1)
+seed_distance = st.number_input("Seed distance meters",value=1,min_value=1)
 
 # Button to run the path planning algorithm
 def plan_path():
@@ -214,8 +219,9 @@ if st.session_state.clicked_path:
     st.image("./filter/Seedoffsets.png",use_column_width="always")
 
 # Title for the simulation part with parameters
-st.title("Simulation_result")
-velocity_model = st.number_input("Velocity",value=1.0)
+st.title("Simulation result")
+st.markdown("Simulate the path to check it for the accuracy of the placed seeds.")
+velocity_model = st.number_input("Velocity m/s",value=1.0)
 iteration_number = st.number_input("Iteration limit",value=500)
 option = st.selectbox("Which controller to use for simulation?",("LQR","PID","MPC"))
 
@@ -226,7 +232,8 @@ def simulate_path():
     elif option == "MPC":
         track_path(st.session_state['simulate_path'],velocity_model,iteration_number)
     elif option == "LQR":
-        track_path_lqr(st.session_state['simulate_path'],0,velocity_model,iteration_number,save_animation=True,save_picture=True)
+        _, _ , _, _, _, _,measurement_accuracy,_,_,_ = track_path_lqr(st.session_state['simulate_path'],0,velocity_model,iteration_number,save_animation=True,save_picture=True)
+        st.session_state['final_accuracy'] = measurement_accuracy
     st.session_state.clicked_simulation = True
 
 st.button("Simulate path test",on_click=simulate_path)
@@ -238,6 +245,7 @@ if st.session_state.clicked_simulation:
     elif option == "MPC":
         st.image("./filter/simulation_field_mpc.png")
     elif option == "LQR":
+        st.markdown(f"Percentage of seeds with an accuracy of 0.8 cm or lower: {st.session_state['final_accuracy']}%")
         st.image("./filter/Path_Tracking_Result.svg")
         file_ = open("./filter/path_tracking_animation.gif", "rb")
         contents = file_.read()
@@ -246,6 +254,6 @@ if st.session_state.clicked_simulation:
         st.markdown(
         f'<center><img src="data:image/gif;base64,{data_url_sim}" alt="field gif"></center>',
         unsafe_allow_html=True,)
-        st.image("./filter/Velocity_Profile_Over_Time.png")
+        st.image("./filter/Velocity Profile Over Time.png")
     else:
         st.write("Wrong simulation chosen or error")
