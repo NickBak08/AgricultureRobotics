@@ -11,9 +11,10 @@ import json
 import numpy as np
 
 def predict_field(image, conf_model):
+    #print("Current_directory: ", os.curdir)
     # Display the combined mask image
     os.makedirs("filter", exist_ok=True)
-    my_model = YOLO("best.pt")
+    my_model = YOLO(f"{os.curdir}/best.pt")
     results = list(
         my_model(image, conf=conf_model, save_json=True)
     )  # If dont have the rewrite predict.py please deleate save_json=True
