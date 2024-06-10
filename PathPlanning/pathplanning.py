@@ -1,6 +1,6 @@
 import json
 import matplotlib.pyplot as plt
-
+import matplotlib
 from shapely.geometry import Polygon
 from shapely.geometry import LineString,MultiLineString
 import geopandas as gpd
@@ -20,6 +20,7 @@ def load_data(filepath,include_obstacles = False):
     Parameters:
         filepath (str): filepath that contains the json file to be parsed
         include_obstacles (bool): boolean to indicate if you want to include the obstacles in the resulting field (will probably be usefull for some debugging)
+        scale_pixels (int): to scale the field to the real size
 
     Returns:
         field (geopandas GeoSeries): GeoSeries of the polygon - the shape of the field 
@@ -345,6 +346,7 @@ def interpolate_path(path,distance,base,no_offset):
                 offset = 0
             distances = np.arange(offset,line.length,distance) # distances between the placed seeds and the beginning of the seed grid
 
+
             try: # if the line is long enough to interpolate
                 interpolated_path = LineString([line.interpolate(distance) for distance in distances])
             except: # if the line is not long enough to interpolate, keep the line as it is
@@ -658,6 +660,7 @@ def check_alignment(sp,grid_hor,grid_ver,seed_count,margin = 0.01,full_score = F
     sp_df['on_grid_hor'] = ver_aligned
     sp_df['on_grid'] = results
     
+
     score = sum(results)/len(hor_aligned)
 
     return score, sp_df
@@ -780,7 +783,7 @@ def boustrophedon_decomposition(field,obstacles,base_ab,slope):
  
     return decomposed_polygons
 
-def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting,seed_distance,no_offset = False):
+def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting,seed_distance,no_offset = False,scale:int=1):
     """
     Loads the data and generates a path.
     
@@ -800,10 +803,15 @@ def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting,seed_d
     # Load the field (with obstacles) from a given json file
     if include_obs:
         field, obstacles = load_data(data_path,include_obs) 
+        fig, ax = plt.subplots()
+        field.plot(ax=ax, color='lightblue', edgecolor='black')
+        plt.savefig("filter/path_plot.png")
     else:
         field = load_data(data_path) 
+        fig, ax = plt.subplots()
+        field.plot(ax=ax, color='lightblue', edgecolor='black')
+        plt.savefig("filter/path_plot.png")
 
-    # Prepare the field
     field_headlands, headland_size = generate_headlands(field,turning_rad,tractor_width)
     coordinates = field.get_coordinates()
     coordinates_headlands = field_headlands.get_coordinates()
@@ -881,6 +889,7 @@ def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting,seed_d
             # Check alignment of the seeds and the score 
             grid_hor,grid_ver,seed_count = create_grid(sp,seed_count,seed_distance,tractor_width)
             score,sp_df =  check_alignment(sp,grid_hor,grid_ver,seed_count,margin = 0.01,full_score = False)
+
             sp_df_list.append(sp_df)
             print('Path {}, score: {}'.format(i,score))
             score_list.append(score)
@@ -890,15 +899,18 @@ def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting,seed_d
             paths.append(None)
             commands.append(None)
             sp_list.append(None)
+            sp_df_list.append(None)
             bases.append(None)
             score_list.append(0)
             print(error)
             
+
     # Find the path with the best measure
     seeds_no = [len(gpd.GeoSeries(sp).get_coordinates()) for sp in sp_list] # total number of seeds for different paths
     best_path_index = np.argmax(np.array(score_list)) # for now the measure is total seed count
     best_score = score_list[best_path_index]
     best_path = paths[best_path_index]
+
     sp = sp_list[best_path_index]
     sp_df = sp_df_list[best_path_index]
     sp_df['euclidian_dist'] = (sp_df['hor_distance']**2+sp_df['ver_distance']**2)**0.5
@@ -917,12 +929,13 @@ def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting,seed_d
         ax.set_ylabel('meters')
         ax.set_title('Final path')
         ax.legend()
-        plt.savefig('final_path.pdf')
+        plt.savefig('filter/final_path.png')
 
         # Plotting seed offsets for different directions 
         fig , ax2 = plt.subplots(1,3,figsize = (15,3))
         plt.rcParams["font.family"] = "serif"
         plt.rcParams["font.serif"] = ["Times New Roman"]
+
         viridis = matplotlib.colormaps['viridis']
 
         im1  = ax2[0].scatter(sp_df.x,sp_df.y, marker = 'o', c = sp_df['hor_distance'],s = 0.1,cmap = viridis)
@@ -955,12 +968,13 @@ def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting,seed_d
         ax2[0].get_legend().remove()
         ax2[1].get_legend().remove()
         ax2[2].get_legend().remove()
-        plt.savefig('Seedoffsets.pdf')
+        plt.savefig('filter/Seedoffsets.png')
 
         # Plotting seed alignment:
         _, ax = plt.subplots(1,3,figsize = (15,5))
         plt.rcParams["font.family"] = "serif"
         plt.rcParams["font.serif"] = ["Times New Roman"]        
+
         for (v,c) in [(True,'b'),(False,'r')]: # Colors based on whether a seed is on the grid or not
             ax[0].plot(sp_df.x[sp_df.on_grid_hor == v],sp_df.y[sp_df.on_grid_hor == v],'o',markersize = 1)
         for (v,c) in [(True,'b'),(False,'r')]:
