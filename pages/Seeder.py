@@ -2,7 +2,6 @@ import streamlit as st
 from ComputerVision.field_prediction import predict_field, predict_json, filter_json, make_bridge
 from PathPlanning.pathplanning import pathplanning,load_data
 from Simulation.MPC_pathtracking import track_path
-from Simulation.PID_pathtracking import path_tracking
 from Simulation.LQR_pathtracking import track_path as track_path_lqr
 from PIL import Image
 import matplotlib.pyplot as plt
@@ -223,13 +222,11 @@ st.title("Simulation result")
 st.markdown("Simulate the path to check it for the accuracy of the placed seeds.")
 velocity_model = st.number_input("Velocity m/s",value=1.0)
 iteration_number = st.number_input("Iteration limit",value=500)
-option = st.selectbox("Which controller to use for simulation?",("LQR","PID","MPC"))
+option = st.selectbox("Which controller to use for simulation?",("LQR","MPC"))
 
 def simulate_path():
     '''Callback function for simulating path button'''
-    if option == "PID":
-        path_tracking(st.session_state['simulate_path'],velocity_model,iteration_number)
-    elif option == "MPC":
+    if option == "MPC":
         track_path(st.session_state['simulate_path'],velocity_model,iteration_number)
     elif option == "LQR":
         _, _ , _, _, _, _,measurement_accuracy,_,_,_ = track_path_lqr(st.session_state['simulate_path'],0,velocity_model,iteration_number,save_animation=True,save_picture=True)
@@ -240,9 +237,7 @@ st.button("Simulate path test",on_click=simulate_path)
 
 # Show the simulation result
 if st.session_state.clicked_simulation:
-    if option == "PID":
-        st.image("./filter/simulation_field.png")
-    elif option == "MPC":
+    if option == "MPC":
         st.image("./filter/simulation_field_mpc.png")
     elif option == "LQR":
         st.markdown(f"Percentage of seeds with an accuracy of 0.8 cm or lower: {st.session_state['final_accuracy']}%")
