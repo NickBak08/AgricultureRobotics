@@ -7,13 +7,13 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 import math
-from .dubins_curves import *
+from dubins_curves import *
 import shapely.affinity
 from shapely import Point
 from shapely.ops import split, nearest_points
 
 
-def load_data(filepath,include_obstacles = False,scale_pixels:int=1):
+def load_data(filepath,include_obstacles = False):
     """
     Loads json file and create polygon object for the field.
 
@@ -23,28 +23,32 @@ def load_data(filepath,include_obstacles = False,scale_pixels:int=1):
         scale_pixels (int): to scale the field to the real size
 
     Returns:
-        field (geopandas GeoSeries): GeoSeries of the polygon - the shape of the field (with obstacles if include_obstacles = True)
+        field (geopandas GeoSeries): GeoSeries of the polygon - the shape of the field 
+        obstacles (list): list of GeoSeries of the obstacles in the field (if include_obstacles = True)
     """
 
     with open(filepath) as json_file:
         json_data = json.load(json_file)
 
+    # initialize lists for creating Polygon object to represent the field
     coordinates = []
     polygons = []
+
     for i in range(len(json_data['features'])):
         coordinates.append(json_data['features'][i]['geometry']['coordinates'])
-        polygons.append(gpd.GeoSeries(Polygon(coordinates[i][0])).scale(scale_pixels,scale_pixels))
+        polygons.append(gpd.GeoSeries(Polygon(coordinates[i][0])))
     
     field = polygons[0]
     obstacles = []
 
+    # including obstacles
     if include_obstacles:
         for i in range(1,len(polygons)):
             obstacles.append(polygons[i])
-        return field,obstacles
+        return field, obstacles
+    
     else:
         return field
-
 
 def generate_headlands(field,turning_rad,tractor_width):
     """
@@ -65,7 +69,6 @@ def generate_headlands(field,turning_rad,tractor_width):
     
     return field_with_headlands, headland_size
         
-
 def linefromvec(vec):
     """
     Turns a vector in to a line in 2d with a slope and intercept.
@@ -131,18 +134,20 @@ def basis_AB_line(edge,coordinates):
     ymin = min(coordinates['y'])
     ymax = max(coordinates['y'])
 
+    # the lines need to cover the whole field when they are copied and translated along the x- or y-axis by the next function
     if pd.isna(slope): # for vertical lines 
         base_AB = np.array([[intercept, ymin],[intercept, ymax]]) # edge x-coord stay the same, y stretches to ymin and ymax
     else: 
         if slope > 0:
             x_1 = min(xmin, (ymin-intercept)/slope)
             x_2 = max(xmax, (ymax-intercept)/slope)
-        elif slope == 0:
+        elif slope == 0: # if the line is horizontal 
             x_1 = xmin
             x_2 = xmax  
         elif slope < 0:
             x_1 = min(xmin, (ymax-intercept)/slope)
             x_2 = max(xmax, (ymin-intercept)/slope)
+
         y_1 = x_1*slope+intercept   
         y_2 = x_2*slope+intercept
         base_AB = np.array([[x_1, y_1],[x_2, y_2]])
@@ -334,21 +339,13 @@ def interpolate_path(path,distance,base,no_offset):
     for i in range(len(path)): # Loop over the list of path segments
         if i%2 == 0: # We always start the path with a straight line, and then turns and straight lines alternate, so each even entry in the list is a straight line segment
             line = path[i][0]
-            if i%4 ==0: # Every second straight line segment has to be reversed; each vector has the same direction, but the tractor
-                        #should drive back and forth, so each 4th element in the row (every second straight path) reversed and then interpolated
-                begin = Point(line.coords[0]) # beginning of the straight line on tractor's path
-                distance_from_base  = begin.distance(base) # distance from the reference line
-                offset = distance - distance_from_base%distance # how much the seeding needs to be offset to make the seeds aligned
-                if no_offset:
-                    offset = 0
-                distances = np.arange(offset,line.length,distance) # distances between the placed seeds and the beginning of the seed grid
-            else:
-                begin = Point(line.coords[0]) # beginning of the straight line on tractor's path - the other direction than the previous one
-                distance_from_base  = begin.distance(base)
-                offset = distance_from_base%distance # the other way than the previous line
-                if no_offset:
-                    offset = 0
-                distances = np.arange(offset,line.length,distance) # the other way than the previous line
+            begin = Point(line.coords[0]) # beginning of the straight line on tractor's path
+            distance_from_base  = begin.distance(base) # distance from the reference line
+            offset = distance - distance_from_base%distance # how much the seeding needs to be offset to make the seeds aligned
+            if no_offset:
+                offset = 0
+            distances = np.arange(offset,line.length,distance) # distances between the placed seeds and the beginning of the seed grid
+
 
             try: # if the line is long enough to interpolate
                 interpolated_path = LineString([line.interpolate(distance) for distance in distances])
@@ -526,7 +523,6 @@ def generate_connect_headlands(field,mainland_path,tractor_width,turning_rad,hea
         if i == 0:
             # the first path in the headlands need to be connected to the path in the mainland
             end_point = Point(mainland_path[-1].get_coordinates().iloc[-1])
-            # print(len(mainland_path))
             path1 = mainland_path[-1]
         else:
             end_point = Point(connected_path[-1].get_coordinates().iloc[-1])
@@ -569,6 +565,7 @@ def create_grid(sp,seed_count,seed_distance,tractor_width):
     Returns:
         grid_hor (MultiLineString): MultiLineString object containing the horizontal lines of the grid
         grid_ver (MultiLineString): MultiLineString object containing the vertical lines of the grid
+        seed_count (int): number of seeds in one planted row
     """
 
     # Create a dataframe of seed coordinates
@@ -579,18 +576,18 @@ def create_grid(sp,seed_count,seed_distance,tractor_width):
     pointb = Point(sp_df.iloc[1])
     pointc = Point(sp_df.iloc[seed_count])
 
-    # Creating horizontal and vertical line segments that define the grid
+    # Create horizontal and vertical line segments that define the grid
     line_seg_hor = LineString([pointa,pointc])
     line_seg_ver = LineString([pointa,pointb])
 
-    # Calculating field width to scale the line segments
+    # Calculate field width to scale the line segments
     field_width = max(sp_df['x'])-min(sp_df['x'])
     field_heigth = max(sp_df['y'])-min(sp_df['y'])
     
     # A safety margin to make sure the grid covers the entire field
     safety_marg = 10
 
-    # Scaling a line segment based on field width and a safety margin
+    # Scale a line segment based on field width and a safety margin
     factor = max([field_width,field_heigth])*safety_marg
     line_hor = shapely.affinity.scale(line_seg_hor,xfact = factor,yfact = factor)
     line_ver = shapely.affinity.scale(line_seg_ver,xfact = factor,yfact = factor)
@@ -629,7 +626,8 @@ def check_alignment(sp,grid_hor,grid_ver,seed_count,margin = 0.01,full_score = F
         full_score (bool): boolean to indicate whether the accuracy is calculated for all seeds or just 1 seed per row
 
     Returns:
-        score (float): a score between 1 and 0 indicating how many seeds are on the grid
+        score (float): a score between 1 and 0 indicating what fraction of seeds is on the grid
+        sp_df (pandas DataFrame): DataFrame with seeds and their alignment to the grid
     """
 
     # If statement to check if we want to calculate all seeds, or just 1 per row
@@ -787,32 +785,33 @@ def boustrophedon_decomposition(field,obstacles,base_ab,slope):
 
 def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting,seed_distance,no_offset = False,scale:int=1):
     """
-    main function for the pathplanning, loads the data and generates a path (maybe its better to make this a class but idk)
+    Loads the data and generates a path.
     
-    args:
+    Parameters:
         data_path (str): filepath that contains the json file to be parsed
-        include_obs (bool): boolean to indicate if you want to include the obstacles in the 
-                            resulting field (will probably be usefull for some debugging)
+        include_obs (bool): boolean to indicate if you want to include the obstacles in the resulting field
         turning_rad (float): turning radius of the tractor in m
-        tractor_width (float): tractor width (same as distance between swaths) in m
+        tractor_width (float): tractor width (same as distance between AB-lines) in m
         plotting (bool): boolean to decide whether you want to plot the generated path or not
-        seed_distance (float): distance between seeds,  same as the interpolation distance 
+        seed_distance (float): distance between seeds, same as the interpolation distance 
 
-    returns:
-        field (geopandas Geoseries): The polygon that defines the field
+    Returns:
+        field (geopandas Geoseries): polygon that defines the field
         best_path (pandas DataFrame): Dataframe containing the xy coordinates of each checkpoint of the path. 
 
     """
+    # Load the field (with obstacles) from a given json file
     if include_obs:
         field, obstacles = load_data(data_path,include_obs) 
         fig, ax = plt.subplots()
         field.plot(ax=ax, color='lightblue', edgecolor='black')
         plt.savefig("filter/path_plot.png")
     else:
-        field = load_data(data_path,include_obs) 
+        field = load_data(data_path) 
         fig, ax = plt.subplots()
         field.plot(ax=ax, color='lightblue', edgecolor='black')
         plt.savefig("filter/path_plot.png")
+
     field_headlands, headland_size = generate_headlands(field,turning_rad,tractor_width)
     coordinates = field.get_coordinates()
     coordinates_headlands = field_headlands.get_coordinates()
@@ -821,7 +820,6 @@ def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting,seed_d
     # Initialize emtpy lists to contain the generated paths and path lengths
     paths = [] 
     commands = []
-    path_lengths = []
     sp_list = []
     bases = []
     score_list = []
@@ -851,6 +849,7 @@ def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting,seed_d
             # At this point, we have found a direction in which we can drive if there are no obstacles present. We now have to make a new field
             paths_subfields = []
             commands_subfields = []
+
             for index,decomposed_field in enumerate(decomposed_polygons):
                 decomposed_field = gpd.GeoSeries(decomposed_field) # Convert decomposed polygons to a geoseries object (and change the name to work in the rest of the functions)
                 swaths_clipped = clip_swaths(swath_list,decomposed_field)
@@ -859,107 +858,112 @@ def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting,seed_d
                 # Interpolate the path with some specified distance
                 path_new, command_new = interpolate_path(path_new,seed_distance,base,no_offset)
                 
-                if index == 0:
+                if index == 0: # if this is the first path
                     paths_subfields = [path_new]
                     commands_subfields = [command_new]
                     path_old = path_new
                     continue
-
+                
+                # Connect the paths (between subfields)
                 connecting_curve = [gpd.GeoSeries(connect_paths(path_old[-1],path_new[0],turning_rad))]
                 paths_subfields.append(connecting_curve)
                 paths_subfields.append(path_new)
                 commands_subfields.append(len(connecting_curve[0].get_coordinates())*[0])
                 commands_subfields.append(command_new)
                 path_old = path_new
-                command_old = command_new
 
             paths_subfields = [val for sublist in paths_subfields for val in sublist]
             commands_subfields = [val for sublist in commands_subfields for val in sublist]
-            # print(paths_subfields)
             path_df = path_to_df(paths_subfields,commands_subfields)
-            headlands_path_connected = generate_connect_headlands(field,paths_subfields,tractor_width,turning_rad,headland_size,seed_distance)
 
+            # Connect the mainland to the headlands
+            headlands_path_connected = generate_connect_headlands(field,paths_subfields,tractor_width,turning_rad,headland_size,seed_distance)
             total_path = pd.concat([path_df,headlands_path_connected])
             total_path_no_dupl = total_path.drop_duplicates(['x','y'] ,ignore_index = True)
             paths.append(total_path_no_dupl)
-            
 
+            # Plant the seeds
             seed_count,sp= plantseeds(total_path_no_dupl,tractor_width,seed_distance)
-            
             sp_list.append(sp)
+            
+            # Check alignment of the seeds and the score 
             grid_hor,grid_ver,seed_count = create_grid(sp,seed_count,seed_distance,tractor_width)
-            # grid_hor_prepped = shapely.prepared.prep(grid_hor)
-            # grid_ver_prepped = shapely.prepared.prep(grid_ver)
-            score,sp_df =  check_alignment(sp,grid_hor,grid_ver,seed_count,margin = 0.01,full_score = True)
+            score,sp_df =  check_alignment(sp,grid_hor,grid_ver,seed_count,margin = 0.01,full_score = False)
+
             sp_df_list.append(sp_df)
             print('Path {}, score: {}'.format(i,score))
             score_list.append(score)
             commands.append(commands_subfields)
 
-
         except Exception as error: # Error handling to make sure the loop continues if an error pops up
             paths.append(None)
             commands.append(None)
-        #     path_lengths.append(0)
             sp_list.append(None)
             sp_df_list.append(None)
             bases.append(None)
             score_list.append(0)
             print(error)
             
-    # Finding the path with the best measure
+
+    # Find the path with the best measure
     seeds_no = [len(gpd.GeoSeries(sp).get_coordinates()) for sp in sp_list] # total number of seeds for different paths
     best_path_index = np.argmax(np.array(score_list)) # for now the measure is total seed count
     best_score = score_list[best_path_index]
     best_path = paths[best_path_index]
-    command = commands[best_path_index]
 
     sp = sp_list[best_path_index]
     sp_df = sp_df_list[best_path_index]
     sp_df['euclidian_dist'] = (sp_df['hor_distance']**2+sp_df['ver_distance']**2)**0.5
     base = bases[best_path_index]
     
-    # Plot the path if it is specified
+    # Plot the path and seed alignment if it is specified
     if plotting:
         # Plotting the final (best) path
         fig, ax = plt.subplots()
-#        plt.rcParams["font.family"] = "serif"
-#        plt.rcParams["font.serif"] = ["Times New Roman"]
-        field.plot(ax = ax,color = 'g',)
-        field_headlands.boundary.plot(ax = ax,color = 'r')
-        best_path.plot(x = 'x', y = 'y',ax = ax,color = 'magenta',marker = 'o',markersize = 1)
+        plt.rcParams["font.family"] = "serif"
+        plt.rcParams["font.serif"] = ["Times New Roman"]
+        field.boundary.plot(ax = ax,color = 'yellowgreen',label = 'field boundary')
+        field_headlands.boundary.plot(ax = ax,color = 'r', label = 'headland boundary')
+        best_path.plot(x = 'x', y = 'y',ax = ax,color = 'magenta',marker = 'o',markersize = 1, label = 'tractor path')
+        ax.set_xlabel('meters')
+        ax.set_ylabel('meters')
         ax.set_title('Final path')
-        ax.get_legend().remove()
+        ax.legend()
         plt.savefig('filter/final_path.png')
 
-
-
         # Plotting seed offsets for different directions 
-        fig , ax2 = plt.subplots(1,3,figsize = (15,5))
-#        plt.rcParams["font.family"] = "serif"
-#        plt.rcParams["font.serif"] = ["Times New Roman"]
+        fig , ax2 = plt.subplots(1,3,figsize = (15,3))
+        plt.rcParams["font.family"] = "serif"
+        plt.rcParams["font.serif"] = ["Times New Roman"]
+
         viridis = matplotlib.colormaps['viridis']
 
         im1  = ax2[0].scatter(sp_df.x,sp_df.y, marker = 'o', c = sp_df['hor_distance'],s = 0.1,cmap = viridis)
         field.boundary.plot(ax = ax2[0],color = 'k')
         best_path.plot(x ='x',y='y',ax = ax2[0],color = 'm', alpha = 0.2)
         ax2[0].set_title('Distance in driving direction')
+        ax2[0].set_xlabel('meters')
+        ax2[0].set_ylabel('meters')
 
         im2 = ax2[1].scatter(sp_df.x,sp_df.y, marker = 'o', c = sp_df['ver_distance'],s = 0.1,cmap = viridis)
         best_path.plot(x ='x',y='y',ax = ax2[1],color = 'm', alpha = 0.2)
         field.boundary.plot(ax = ax2[1],color = 'k')
         ax2[1].set_title('Distance normal to driving direction')
+        ax2[1].set_xlabel('meters')
+        ax2[1].set_ylabel('meters')
 
         im3 = ax2[2].scatter(sp_df.x,sp_df.y, marker = 'o', c = sp_df['euclidian_dist'],s = 0.1,cmap = viridis)
         best_path.plot(x ='x',y='y',ax = ax2[2],color = 'm', alpha = 0.2)
         field.boundary.plot(ax = ax2[2],color = 'k')
         ax2[2].set_title('Euclidean distance')
+        ax2[1].set_xlabel('meters')
+        ax2[1].set_ylabel('meters')
 
         fig.subplots_adjust(right=0.8)
         cbar_ax = fig.add_axes([0.85, 0.30, 0.01, 0.4])
         cbar = fig.colorbar(im1, cax=cbar_ax)
         cbar.set_label('Distance [m]')
-        fig.suptitle('Seed positions for final path, total score: {}'.format(best_score))
+        fig.suptitle('Seed distance from perfect grid, total score: {}, seed count: {}'.format(best_score,seed_count))
 
         ax2[0].get_legend().remove()
         ax2[1].get_legend().remove()
@@ -968,8 +972,9 @@ def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting,seed_d
 
         # Plotting seed alignment:
         _, ax = plt.subplots(1,3,figsize = (15,5))
-#        plt.rcParams["font.family"] = "serif"
-#        plt.rcParams["font.serif"] = ["Times New Roman"]        
+        plt.rcParams["font.family"] = "serif"
+        plt.rcParams["font.serif"] = ["Times New Roman"]        
+
         for (v,c) in [(True,'b'),(False,'r')]: # Colors based on whether a seed is on the grid or not
             ax[0].plot(sp_df.x[sp_df.on_grid_hor == v],sp_df.y[sp_df.on_grid_hor == v],'o',markersize = 1)
         for (v,c) in [(True,'b'),(False,'r')]:
@@ -977,13 +982,61 @@ def pathplanning(data_path,include_obs,turning_rad,tractor_width,plotting,seed_d
         for (v,c) in [(True,'b'),(False,'r')]:
             ax[2].plot(sp_df.x[sp_df.on_grid == v],sp_df.y[sp_df.on_grid == v],'o',markersize = 1)
 
+        ax[0].set_xlabel('meters')
+        ax[0].set_ylabel('meters')
+        ax[1].set_xlabel('meters')
+        ax[1].set_ylabel('meters')
+        ax[2].set_xlabel('meters')
+        ax[2].set_ylabel('meters')        
         ax[0].legend(['Aligned', 'Misaligned'])
         ax[1].legend(['Aligned', 'Misaligned'])
         ax[2].legend(['Aligned', 'Misaligned'])
-        ax[0].set_title('horizontal alignment')
-        ax[1].set_title('vertical alignment')
+        ax[0].set_title('Alignment in driving direction')
+        ax[1].set_title('Alignment normal to driving direction')
         ax[2].set_title('Total alignment')
-        plt.savefig('filter/Seedalignment.png')
+        plt.savefig('Seedalignment.pdf')
 
-    
     return field,field_headlands,best_path,sp, swaths_clipped,base, total_path, bases,sp_df
+
+
+# Example 
+import time
+import matplotlib
+
+start = time.time()
+data_path ="./data/field_geometry/Eric_field_geojson.json"
+include_obs = False
+
+turning_rad = 4
+tractor_width = 3
+seed_distance = 2
+
+field, field_headlands, best_path,sp,swaths_clipped,base, total_path, bases,sp_df = pathplanning(data_path,include_obs,turning_rad,tractor_width,True,seed_distance,False)
+
+end = time.time()
+print('total time elapsed: {:6f}'.format(end-start))
+
+
+# Make a gif with the path of the tractor and seed positions
+import matplotlib.animation as animation
+
+fig, ax = plt.subplots()
+field.plot(ax = ax,color = 'g')
+
+xdata, y = [], []
+
+graph1, = ax.plot([], [], 'mo-')
+
+# animation function
+def animate(i):
+    xdata.append(total_path.iloc[5*i]['x'])
+    y.append(total_path.iloc[5*i]['y'])
+    graph1.set_data(xdata, y)
+    return (graph1,)
+
+length = len(total_path)//5
+anim = animation.FuncAnimation(fig, animate,  frames=length, interval=10, blit=True)
+# To save the animation using Pillow as a gif
+writer = animation.PillowWriter(fps=60)
+anim.save('scatter.gif', writer=writer)
+plt.show()
