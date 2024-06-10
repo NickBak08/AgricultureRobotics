@@ -7,15 +7,19 @@ from matplotlib.animation import FuncAnimation
 from scipy.spatial import KDTree
 from matplotlib.colors import Normalize
 
+
 MAX_STEER = np.deg2rad(60.0)  # maximum steering angle [rad]
 MAX_ACC = 2
 MAX_VEL = 5
+
 N=100 
 EPS = 1e-4 
 Q = np.eye(3)*3
 R = np.eye(2)*2.
+
 L = 2.0  
 dt = 0.1 
+
 
 class KinematicModel:
     """
@@ -416,6 +420,12 @@ def track_path(refer_df, initial_speed, target_speed, iteration_limit, noise = N
         # Update the tractor state
         tractor.update_state(acceleration, delta) 
 
+    
+    if (save_animation == True):
+        fig = plt.figure(figsize=(8, 8))
+        animation = FuncAnimation(fig, update_plot, frames=len(x_), interval=100)
+        animation.save('./filter/path_tracking_animation.gif', writer='pillow') 
+
     # Calculate the accuracy
     measurement_accuracy = 0    
     
@@ -451,7 +461,7 @@ def track_path(refer_df, initial_speed, target_speed, iteration_limit, noise = N
     plt.grid(True)
     plt.show()
     if save_picture == True:
-        plt.savefig('Path Tracking Result.svg', format='svg',bbox_inches='tight')
+        plt.savefig('./filter/Path_Tracking_Result.svg', format='svg',bbox_inches='tight')
 
     plt.figure(figsize=(8, 8))
     plt.plot(lateral_error,'-b')
@@ -460,6 +470,8 @@ def track_path(refer_df, initial_speed, target_speed, iteration_limit, noise = N
     plt.title('Lateral Error Over Time')
     if save_picture == True:
         plt.savefig('Lateral Error Over Time.svg', format='svg',bbox_inches='tight')
+        plt.savefig('./filter/Velocity_Profile_Over_Time.png',bbox_inches='tight')
+
 
     plt.figure(figsize=(8, 8))
     plt.plot(longitudinal_error,'-b')
@@ -543,9 +555,11 @@ def track_path(refer_df, initial_speed, target_speed, iteration_limit, noise = N
 data_path ='Best_path'
 
 
+
 # NOTICE
 # Use the pathplanning result as the refer_path, set iteration_limit a large number (20000 or more).
 # Lower target speed can result in better performance, but it takes lots of time.
+
 
 refer_path = pd.read_csv(data_path) # Change to the path plan result
 x_points = np.array(refer_path['x'])
@@ -559,3 +573,4 @@ save_animation = None #save the animation would take a long time to complete, do
 
 # Use this function to see the Simulation result
 x_,y_,plant_points_x,plant_points_y,plant_points_yaw, command, accuracy, lateral_error,longitudinal_error,distance = track_path(refer_path, initial_speed, target_speed, iteration_limit,noise,save_picture,save_animation)
+

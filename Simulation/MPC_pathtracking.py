@@ -506,6 +506,7 @@ def track_path(refer_df, initial_speed, target_speed,iteration_limit,save_pictur
     overshoot_percentage = (overshoot / target_speed) * 100
     print(f"Overshoot of velocity: {overshoot:.2f} m/s ({overshoot_percentage:.2f}%)")
 
+
     # Visualize the final result
     # Change the font in all plots
     plt.rcParams["font.family"] = "serif"
@@ -528,11 +529,13 @@ def track_path(refer_df, initial_speed, target_speed,iteration_limit,save_pictur
     if save_picture == True:
         plt.savefig('Path Tracking Result.svg', format='svg',bbox_inches='tight')
 
+
     plt.figure(figsize=(8, 8))
     plt.plot(lateral_error,'-b')
     plt.xlabel('Time Steps')
     plt.ylabel('Lateral Error')
     plt.title('Lateral Error Over Time')
+
 
     plt.figure(figsize=(8, 8))
     plt.plot(longitudinal_error,'-b')

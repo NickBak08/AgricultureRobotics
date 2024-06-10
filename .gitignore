@@ -167,3 +167,8 @@ cython_debug/
 .vscode/extensions.json
 .vscode/*.code-snippets
 *.code-workspace
+
+# Ignore image data
+ComputerVision/images/*
+filter
+test
