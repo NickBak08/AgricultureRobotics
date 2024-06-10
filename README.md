@@ -2,14 +2,14 @@
 The repository for the TU/e project agriculture robotics in collaboration with VeXtronics.
 Program is tested on windows 11. 
 
-## Contributers
+## Contributors
 - Hao Zhou
 - Hidde Huitema
 - Liz Li
 - Alicja Obszyńska
 - Nick Bakker
 
-## Rules contributers
+## Rules contributors
 - Make a new branch for every subsystem (pathplanning, computervision, simulation)
 - When implementing a new feature create a new branch in your subbranch (computervision/yolo)
 - Commit often not only when you want to push your code
