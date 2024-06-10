@@ -15,6 +15,17 @@ Program is tested on windows 11.
 - Commit often not only when you want to push your code
 - When merging asks others to review the code
 
+## General information
+- You can find the files for the different parts of the pipeline in their corresponding folders.
+- The GUI can be found in pages and then the file seeder.py.
+- For installation see  <strong>Using docker to run the program</strong>.
+- Most important files are:
+  - ComputerVision/field_prediction.py
+  - PathPlanning/pathplanning.py
+  - Simulation/LQR_pathtracking.py
+  - Simulation/MPC_pathtracking.py
+  - pages/seeder.py
+- Dataset can be found under ComputerVision/YOLO/ultralytics-main/datasets/images
 # Using docker to run the program:
 Docker is the easiest way to run the pipeline. Follow the steps below and the program can be run. 
 1) Install docker: https://docs.docker.com/desktop/install/windows-install/
