@@ -241,7 +241,7 @@ if st.session_state.clicked_simulation:
         st.image("./filter/simulation_field_mpc.png")
     elif option == "LQR":
         st.markdown(f"Percentage of seeds with an accuracy of 0.8 cm or lower: {st.session_state['final_accuracy']}%")
-        st.image("./filter/Path_Tracking_Result.svg")
+        st.image("./filter/Path_Tracking_Result.png")
         file_ = open("./filter/path_tracking_animation.gif", "rb")
         contents = file_.read()
         data_url_sim = base64.b64encode(contents).decode("utf-8")
