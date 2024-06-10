@@ -166,6 +166,7 @@ if st.session_state.show_field:
 # For inputing the parameters of the dynamics of the tractor
 st.title("Parameters path planning")
 st.markdown("Input the parameters of the vehicle and plan a path across the field.")
+st.markdown("If an error occurs this can be because the field size is not realistic compared to the input parameters or the otherway around.")
 turning_radius = st.number_input("Turning radius meters", value=1,min_value=1)
 tractor_width = st.number_input("Tractor width meters",value=1,min_value=1)
 seed_distance = st.number_input("Seed distance meters",value=1,min_value=1)
