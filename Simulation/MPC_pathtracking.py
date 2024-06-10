@@ -509,8 +509,8 @@ def track_path(refer_df, initial_speed, target_speed,iteration_limit,save_pictur
 
     # Visualize the final result
     # Change the font in all plots
-    plt.rcParams["font.family"] = "serif"
-    plt.rcParams["font.serif"] = ["Times New Roman"]
+    #plt.rcParams["font.family"] = "serif"
+    #plt.rcParams["font.serif"] = ["Times New Roman"]
     if (save_animation == True):
         fig = plt.figure(figsize=(8, 8))
         animation = FuncAnimation(fig, update_plot, frames=len(x_), interval=100)
@@ -613,21 +613,21 @@ def track_path(refer_df, initial_speed, target_speed,iteration_limit,save_pictur
     return x_, y_ ,plant_points_x, plant_points_y, plant_points_yaw, commands, measurement_accuracy,lateral_error,longitudinal_error,distance
 
 
-data_path ='Best_path'
+# data_path ='Best_path'
 
-# NOTICE
-# Use the pathplanning result as the refer_path, set iteration_limit a large number (20000 or more).
-# Lower target speed can result in better performance, but it takes lots of time.
-refer_path = pd.read_csv(data_path) # Change to the path plan result
-initial_speed = 0
-target_speed = 1.5 # (m/s)
-iteration_limit = 1000
-noise = None
-save_picture = None
-save_animation = None #save the animation would take a long time to complete, dont recommand to use it in low target speed(less than 10),its hard to see tractor moving
+# # NOTICE
+# # Use the pathplanning result as the refer_path, set iteration_limit a large number (20000 or more).
+# # Lower target speed can result in better performance, but it takes lots of time.
+# refer_path = pd.read_csv(data_path) # Change to the path plan result
+# initial_speed = 0
+# target_speed = 1.5 # (m/s)
+# iteration_limit = 1000
+# noise = None
+# save_picture = None
+# save_animation = None #save the animation would take a long time to complete, dont recommand to use it in low target speed(less than 10),its hard to see tractor moving
 
-# Use this function to see the Simulation result
-x_,y_, plant_points_x, plant_points_y, plant_points_yaw, commands,accuracy,lateral_error,longitudinal_error,distance = track_path(refer_path,initial_speed,target_speed,iteration_limit)
+# # Use this function to see the Simulation result
+# x_,y_, plant_points_x, plant_points_y, plant_points_yaw, commands,accuracy,lateral_error,longitudinal_error,distance = track_path(refer_path,initial_speed,target_speed,iteration_limit)
 
 
 
