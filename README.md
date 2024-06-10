@@ -2,17 +2,14 @@
 The repository for the TU/e project agriculture robotics in collaboration with VeXtronics.
 Program is tested on windows 11. 
 
-## Rules
+## Rules contributers
 - Make a new branch for every subsystem (pathplanning, computervision, simulation)
 - When implementing a new feature create a new branch in your subbranch (computervision/yolo)
 - Commit often not only when you want to push your code
 - When merging asks others to review the code
 
-# Installing CVAT Information
-For installing CVAT on windows you need to follow the following steps
-[Link to installing instructions](https://opencv.github.io/cvat/docs/administration/basics/installation/)
-
 # Using docker to run the program:
+Docker is the easiest way to run the pipeline. Follow the steps below and the program can be run. 
 1) Install docker: https://docs.docker.com/desktop/install/windows-install/
 2) Make sure to also install wsl on windows otherwise docker won't work.
 3) Start docker desktop to activate the docker deamon.
@@ -25,8 +22,12 @@ For installing CVAT on windows you need to follow the following steps
 10) In google chrome type localhost:8501
 
 # Run program without docker:
-For faster testing, don't need to build docker everytime you change something
+To run the program without docker, make sure an environment is made on your computer with the packages from the requirements.txt. 
 1) Clone the repo onto your system.
 2) Go inside AgricultureRobotics in your terminal
 3) Type ``` streamlit run HomePage.py ```
 4) You will get erros these are probably errors that you miss packages. Install all these packages and it should work. 
+
+# Installing CVAT Information
+For installing CVAT on windows you need to follow the following steps
+[Link to installing instructions](https://opencv.github.io/cvat/docs/administration/basics/installation/)
