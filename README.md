@@ -2,6 +2,13 @@
 The repository for the TU/e project agriculture robotics in collaboration with VeXtronics.
 Program is tested on windows 11. 
 
+## Contributers
+- Hao Zhou
+- Hidde Huitema
+- Liz Li
+- Alicja Obszyńska
+- Nick Bakker
+
 ## Rules contributers
 - Make a new branch for every subsystem (pathplanning, computervision, simulation)
 - When implementing a new feature create a new branch in your subbranch (computervision/yolo)
@@ -31,3 +38,6 @@ To run the program without docker, make sure an environment is made on your comp
 # Installing CVAT Information
 For installing CVAT on windows you need to follow the following steps
 [Link to installing instructions](https://opencv.github.io/cvat/docs/administration/basics/installation/)
+
+# Acknowledgements
+The authors would like to thank Yannick Heuts and Erik Vermeer for their supervision during the project and their supporting feedback during the weekly meetings. 
