@@ -14,13 +14,14 @@ For installing CVAT on windows you need to follow the following steps
 
 # Using docker to run the program:
 1) Install docker: https://docs.docker.com/desktop/install/windows-install/
-2) Make sure you have installed the most updated version of google chrome
-3) Add personal access token to GitHub account (Settings -> developer settings -> personal access tokens).
-4) Make sure repo and write:packages boxes are checked when creating personal access token
-5) Clone repository onto your system ``` git clone "link to repository" ```
-6) In powershell go to the folder you just cloned (inside AgricultureRobotics) and type: ``` docker build -t streamlit . ``` (Can take a couple of minutes)
-7) When it is build run: ``` docker run -it -p 8501:8501 -e GITHUB_TOKEN="YOUR_TOKEN" streamlit ```
-8) In google chrome type localhost:8501
+2) Make sure to also install wsl on windows otherwise docker won't work.
+3) Make sure you have installed the most updated version of google chrome
+4) Add personal access token to GitHub account (Settings -> developer settings -> personal access tokens).
+5) Make sure repo and write:packages boxes are checked when creating personal access token
+6) Clone repository onto your system ``` git clone "link to repository" ```
+7) In powershell go to the folder (inside AgricultureRobotics) and type: ``` docker build -t streamlit . ``` (Can take a couple of minutes)
+8) When it is build run: ``` docker run -it -p 8501:8501 -e GITHUB_TOKEN="YOUR_TOKEN" streamlit ```
+9) In google chrome type localhost:8501
 
 # Run program without docker:
 For faster testing, don't need to build docker everytime you change something
